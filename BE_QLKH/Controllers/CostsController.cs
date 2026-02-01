@@ -64,7 +64,7 @@ public class CostsController : ControllerBase
         if (int.TryParse(legacyIdStr, out int currentUserId))
         {
             // Define roles that can view ALL costs
-            var viewAllRoles = new[] { "admin", "director", "giam_doc", "manager", "ip_manager", "quan_ly", "accountant", "ke_toan" };
+            var viewAllRoles = new[] { "admin", "director", "giam_doc", "manager", "ip_manager", "quan_ly", "accountant", "ke_toan", "marketing_sales", "sales" };
             
             if (!viewAllRoles.Contains(userRole))
             {
