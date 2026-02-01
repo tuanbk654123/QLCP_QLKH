@@ -1,0 +1,44 @@
+services:
+  mongo:
+    image: mongo:latest
+    container_name: qlkh_mongo
+    restart: always
+    environment:
+      MONGO_INITDB_DATABASE: QLKH
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - qlkh_network
+
+  backend:
+    build: ./BE_QLKH
+    container_name: qlkh_backend
+    restart: always
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - MongoDb__ConnectionString=mongodb://mongo:27017
+      - MongoDb__DatabaseName=QLKH
+    ports:
+      - "8080:8080"
+    depends_on:
+      - mongo
+    networks:
+      - qlkh_network
+
+  frontend:
+    build: ./Qu-n-l-kh-ch-h-ng-qu-n-l-t-i-ch-nh
+    container_name: qlkh_frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - qlkh_network
+
+networks:
+  qlkh_network:
+    driver: bridge
+
+volumes:
+  mongo_data:
