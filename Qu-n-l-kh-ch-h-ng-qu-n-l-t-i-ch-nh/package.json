@@ -1,0 +1,57 @@
+{
+  "name": "qlns",
+  "version": "1.0.0",
+  "description": "Hệ thống quản lý công ty - Quản lý khách hàng, doanh nghiệp, công việc nội bộ, thu chi",
+  "private": true,
+  "dependencies": {
+    "@ant-design/icons": "^5.2.6",
+    "@microsoft/signalr": "^10.0.0",
+    "antd": "^5.12.8",
+    "axios": "^1.6.2",
+    "axios-mock-adapter": "^1.22.0",
+    "clsx": "^2.1.0",
+    "docx": "^8.5.0",
+    "file-saver": "^2.0.5",
+    "lodash": "^4.17.21",
+    "moment": "^2.30.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-icons": "^4.12.0",
+    "react-intl": "^6.5.1",
+    "react-router-dom": "^6.21.1",
+    "recharts": "^2.10.3",
+    "styled-components": "^6.1.6",
+    "xlsx": "^0.18.5",
+    "xlsx-js-style": "^1.2.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.7",
+    "@babel/preset-env": "^7.20.2",
+    "@babel/preset-react": "^7.14.5",
+    "@craco/craco": "^7.1.0",
+    "react-scripts": "5.0.1"
+  },
+  "scripts": {
+    "start": "craco start",
+    "build": "craco build",
+    "test": "craco test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+.transactions-container {
+  padding: 24px;
+  background: #fff;
+  min-height: 100vh;
+}
+
+.transactions-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.transactions-header h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+

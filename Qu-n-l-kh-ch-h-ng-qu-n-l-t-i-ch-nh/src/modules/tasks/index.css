@@ -1,0 +1,19 @@
+.tasks-container {
+  padding: 24px;
+  background: #fff;
+  min-height: 100vh;
+}
+
+.tasks-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.tasks-header h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+

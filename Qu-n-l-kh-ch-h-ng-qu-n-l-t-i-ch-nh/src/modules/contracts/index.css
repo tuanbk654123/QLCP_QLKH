@@ -1,0 +1,38 @@
+.contracts-container {
+  padding: 24px;
+  background: #fff;
+  min-height: 100vh;
+}
+
+.contracts-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.contracts-header h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.contract-form .form-section {
+  margin: 24px 0;
+  padding: 20px;
+  background: #f5f5f5;
+  border-radius: 4px;
+}
+
+.contract-form .form-section h3 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1890ff;
+}
+
+.contract-preview {
+  background: #fff;
+  padding: 0;
+}
+
