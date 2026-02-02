@@ -23,10 +23,20 @@ import './index.css';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
+const { useBreakpoint } = Grid;
 
 const AppLayout = ({ children }) => {
+  const screens = useBreakpoint();
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
+  
+  // Close mobile menu when route changes
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
+
+  const isMobile = !screens.lg;
   const location = useLocation();
   const { user, logout, canAccessUsersModule, canAccessPermissions, getPermissionLevel, isAdmin } = useAuth();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotification();
@@ -172,33 +182,51 @@ const AppLayout = ({ children }) => {
     },
   ];
 
+  const renderSiderContent = (collapsedState) => (
+    <>
+      <div className="logo">
+        <h2 style={{ color: '#1890ff', padding: '16px', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden' }}>
+          {collapsedState ? 'QLNS' : 'Quản lý Công ty'}
+        </h2>
+      </div>
+      <Menu
+        mode="inline"
+        selectedKeys={[location.pathname]}
+        items={getMenuItems()}
+        onClick={handleMenuClick}
+      />
+    </>
+  );
+
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Sider
-        collapsible
-        collapsed={collapsed}
-        onCollapse={setCollapsed}
-        trigger={null}
-        theme="light"
-        width={250}
-      >
-        <div className="logo">
-          <h2 style={{ color: '#1890ff', padding: '16px', margin: 0 }}>
-            {collapsed ? 'QLNS' : 'Quản lý Công ty'}
-          </h2>
-        </div>
-        <Menu
-          mode="inline"
-          selectedKeys={[location.pathname]}
-          items={getMenuItems()}
-          onClick={handleMenuClick}
-        />
-      </Sider>
+      {!isMobile ? (
+        <Sider
+          collapsible
+          collapsed={collapsed}
+          onCollapse={setCollapsed}
+          trigger={null}
+          theme="light"
+          width={250}
+        >
+          {renderSiderContent(collapsed)}
+        </Sider>
+      ) : (
+        <Drawer
+          placement="left"
+          onClose={() => setMobileMenuOpen(false)}
+          open={mobileMenuOpen}
+          width={250}
+          bodyStyle={{ padding: 0 }}
+        >
+          {renderSiderContent(false)}
+        </Drawer>
+      )}
       <Layout>
         <Header
           style={{
             background: '#fff',
-            padding: '0 24px',
+            padding: isMobile ? '0 12px' : '0 24px',
             boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
             display: 'flex',
             justifyContent: 'space-between',
@@ -206,16 +234,16 @@ const AppLayout = ({ children }) => {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            {React.createElement(collapsed ? MenuUnfoldOutlined : MenuFoldOutlined, {
+            {React.createElement(isMobile ? MenuUnfoldOutlined : (collapsed ? MenuUnfoldOutlined : MenuFoldOutlined), {
               className: 'trigger',
-              onClick: () => setCollapsed(!collapsed),
-              style: { fontSize: '20px', marginRight: '24px', cursor: 'pointer', color: '#1890ff' }
+              onClick: () => isMobile ? setMobileMenuOpen(true) : setCollapsed(!collapsed),
+              style: { fontSize: '20px', marginRight: isMobile ? '12px' : '24px', cursor: 'pointer', color: '#1890ff' }
             })}
-            <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 600 }}>
-              Hệ thống Quản lý Công ty
+            <h1 style={{ margin: 0, fontSize: isMobile ? '16px' : '20px', fontWeight: 600 }}>
+              {isMobile ? 'QLNS' : 'Hệ thống Quản lý Công ty'}
             </h1>
           </div>
-          <Space size="large">
+          <Space size={isMobile ? "small" : "large"}>
             <Popover
               content={notificationContent}
               trigger="click"
@@ -230,9 +258,11 @@ const AppLayout = ({ children }) => {
             </Popover>
 
             <Space>
-              <span style={{ color: '#666' }}>
-                {user?.fullName || user?.username}
-              </span>
+              {!isMobile && (
+                <span style={{ color: '#666' }}>
+                  {user?.fullName || user?.username}
+                </span>
+              )}
               <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
                 <Avatar
                   style={{ backgroundColor: '#1890ff', cursor: 'pointer' }}
@@ -242,7 +272,7 @@ const AppLayout = ({ children }) => {
             </Space>
           </Space>
         </Header>
-        <Content style={{ margin: '24px', background: '#fff' }}>
+        <Content style={{ margin: isMobile ? '12px' : '24px', background: '#fff' }}>
           {children}
         </Content>
       </Layout>
