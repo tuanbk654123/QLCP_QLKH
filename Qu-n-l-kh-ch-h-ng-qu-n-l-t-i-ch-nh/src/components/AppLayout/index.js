@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Layout, Menu, Dropdown, Avatar, Space, Badge, Popover, List, Typography, Button, Empty } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Layout, Menu, Dropdown, Avatar, Space, Badge, Popover, List, Typography, Button, Empty, Drawer, Grid } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   DashboardOutlined,
@@ -30,6 +30,7 @@ const AppLayout = ({ children }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   
   // Close mobile menu when route changes
   useEffect(() => {
@@ -37,7 +38,6 @@ const AppLayout = ({ children }) => {
   }, [location.pathname]);
 
   const isMobile = !screens.lg;
-  const location = useLocation();
   const { user, logout, canAccessUsersModule, canAccessPermissions, getPermissionLevel, isAdmin } = useAuth();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotification();
   const [visible, setVisible] = useState(false);
