@@ -404,7 +404,7 @@ const Costs = () => {
       hidden: !canReadField('voucherType'),
     },
     {
-      title: 'Số chứng từ',
+      title: 'Số chứng từ/Số hợp đồng',
       dataIndex: 'voucherNumber',
       key: 'voucherNumber',
       width: 120,

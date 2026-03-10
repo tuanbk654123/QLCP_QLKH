@@ -705,7 +705,7 @@ const CostFormModal = ({
           <Col span={8}>
             <Form.Item
               name="voucherNumber"
-              label="Số chứng từ"
+              label="Số chứng từ/Số hợp đồng"
             >
               <Input disabled={!canEditField('voucherNumber')} />
             </Form.Item>

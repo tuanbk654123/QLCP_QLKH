@@ -4,7 +4,6 @@ import {
   Input,
   Button,
   Space,
-  Tag,
   Modal,
   Form,
   message,
@@ -273,15 +272,6 @@ const Customers = () => {
 
   const columns = [
     {
-      title: 'ID',
-      dataIndex: 'id',
-      key: 'id',
-      width: 60,
-      fixed: 'left',
-      sorter: true,
-      ...getColumnSearchProps('id'),
-    },
-    {
       title: 'Tên khách hàng',
       dataIndex: 'name',
       key: 'name',
@@ -292,6 +282,15 @@ const Customers = () => {
       hidden: !canReadField('name'),
     },
     {
+      title: 'Quy mô doanh nghiệp',
+      dataIndex: 'businessScale',
+      key: 'businessScale',
+      width: 150,
+      sorter: true,
+      ...getColumnSearchProps('businessScale'),
+      hidden: !canReadField('businessScale'),
+    },
+    {
       title: 'Mã số thuế',
       dataIndex: 'taxCode',
       key: 'taxCode',
@@ -299,15 +298,6 @@ const Customers = () => {
       sorter: true,
       ...getColumnSearchProps('taxCode'),
       hidden: !canReadField('taxCode'),
-    },
-    {
-      title: 'Công ty',
-      dataIndex: 'company',
-      key: 'company',
-      width: 180,
-      sorter: true,
-      ...getColumnSearchProps('company'),
-      hidden: !canReadField('company'),
     },
     {
       title: 'Địa chỉ',
@@ -337,15 +327,6 @@ const Customers = () => {
       hidden: !canReadField('representativePosition'),
     },
     {
-      title: 'SĐT Đại diện',
-      dataIndex: 'representativePhone',
-      key: 'representativePhone',
-      width: 120,
-      sorter: true,
-      ...getColumnSearchProps('representativePhone'),
-      hidden: !canReadField('representativePhone'),
-    },
-    {
       title: 'Email',
       dataIndex: 'email',
       key: 'email',
@@ -364,6 +345,42 @@ const Customers = () => {
       hidden: !canReadField('phone'),
     },
     {
+      title: 'CCCD/Hộ chiếu',
+      dataIndex: 'idNumber',
+      key: 'idNumber',
+      width: 140,
+      sorter: true,
+      ...getColumnSearchProps('idNumber'),
+      hidden: !canReadField('idNumber'),
+    },
+    {
+      title: 'Người liên hệ',
+      dataIndex: 'contactPerson',
+      key: 'contactPerson',
+      width: 150,
+      sorter: true,
+      ...getColumnSearchProps('contactPerson'),
+      hidden: !canReadField('contactPerson'),
+    },
+    {
+      title: 'SĐT người liên hệ',
+      dataIndex: 'contactPhone',
+      key: 'contactPhone',
+      width: 140,
+      sorter: true,
+      ...getColumnSearchProps('contactPhone'),
+      hidden: !canReadField('contactPhone'),
+    },
+    {
+      title: 'Email người liên hệ',
+      dataIndex: 'contactEmail',
+      key: 'contactEmail',
+      width: 180,
+      sorter: true,
+      ...getColumnSearchProps('contactEmail'),
+      hidden: !canReadField('contactEmail'),
+    },
+    {
       title: 'Nhu cầu',
       dataIndex: 'businessNeeds',
       key: 'businessNeeds',
@@ -373,38 +390,7 @@ const Customers = () => {
       hidden: !canReadField('businessNeeds'),
     },
     {
-      title: 'Quy mô',
-      dataIndex: 'businessScale',
-      key: 'businessScale',
-      width: 120,
-      sorter: true,
-      ...getColumnSearchProps('businessScale'),
-      hidden: !canReadField('businessScale'),
-    },
-    {
-      title: 'Ngành nghề',
-      dataIndex: 'businessIndustry',
-      key: 'businessIndustry',
-      width: 150,
-      sorter: true,
-      ...getColumnSearchProps('businessIndustry'),
-      hidden: !canReadField('businessIndustry'),
-    },
-    {
-      title: 'Trạng thái',
-      dataIndex: 'status',
-      key: 'status',
-      width: 120,
-      sorter: true,
-      ...getColumnSearchProps('status'),
-      render: (status) => (
-        <Tag color={status === 'active' ? 'green' : 'red'}>
-          {status === 'active' ? 'Hoạt động' : 'Không hoạt động'}
-        </Tag>
-      ),
-    },
-    {
-      title: 'Tiềm năng',
+      title: 'Mức độ tiềm năng',
       dataIndex: 'potentialLevel',
       key: 'potentialLevel',
       width: 120,
@@ -422,7 +408,7 @@ const Customers = () => {
       hidden: !canReadField('priority'),
     },
     {
-      title: 'Nguồn',
+      title: 'Phân loại nguồn',
       dataIndex: 'sourceClassification',
       key: 'sourceClassification',
       width: 120,
@@ -440,6 +426,24 @@ const Customers = () => {
       hidden: !canReadField('nsnnSource'),
     },
     {
+      title: 'Thương hiệu',
+      dataIndex: 'brandName',
+      key: 'brandName',
+      width: 150,
+      sorter: true,
+      ...getColumnSearchProps('brandName'),
+      hidden: !canReadField('brandName'),
+    },
+    {
+      title: 'Sản phẩm/Dịch vụ đi kèm thương hiệu',
+      dataIndex: 'productsServices',
+      key: 'productsServices',
+      width: 260,
+      sorter: true,
+      ...getColumnSearchProps('productsServices'),
+      hidden: !canReadField('productsServices'),
+    },
+    {
       title: 'Tình trạng tư vấn',
       dataIndex: 'consultingStatus',
       key: 'consultingStatus',
@@ -449,61 +453,142 @@ const Customers = () => {
       hidden: !canReadField('consultingStatus'),
     },
     {
-      title: 'Nhóm SHTT',
+      title: 'Nhóm SHTT sau khi phân loại',
       dataIndex: 'ipGroup',
       key: 'ipGroup',
-      width: 120,
+      width: 200,
       sorter: true,
       ...getColumnSearchProps('ipGroup'),
       hidden: !canReadField('ipGroup'),
     },
     {
-      title: 'SP/Dịch vụ',
-      dataIndex: 'productsServices',
-      key: 'productsServices',
+      title: 'Chủ sở hữu',
+      dataIndex: 'owner',
+      key: 'owner',
       width: 150,
       sorter: true,
-      ...getColumnSearchProps('productsServices'),
-      hidden: !canReadField('productsServices'),
+      ...getColumnSearchProps('owner'),
+      hidden: !canReadField('owner'),
     },
     {
-      title: 'Bản quyền',
-      dataIndex: 'copyrightStatus',
-      key: 'copyrightStatus',
+      title: 'Lãnh thổ bảo hộ',
+      dataIndex: 'protectionTerritory',
+      key: 'protectionTerritory',
       width: 150,
       sorter: true,
-      ...getColumnSearchProps('copyrightStatus'),
-      hidden: !canReadField('copyrightStatus'),
+      ...getColumnSearchProps('protectionTerritory'),
+      hidden: !canReadField('protectionTerritory'),
     },
     {
-      title: 'Nhãn hiệu',
-      dataIndex: 'trademarkStatus',
-      key: 'trademarkStatus',
+      title: 'Uỷ quyền',
+      dataIndex: 'authorization',
+      key: 'authorization',
+      width: 120,
+      sorter: true,
+      ...getColumnSearchProps('authorization'),
+      hidden: !canReadField('authorization'),
+    },
+    {
+      title: 'Tình trạng nộp đơn',
+      dataIndex: 'filingStatus',
+      key: 'filingStatus',
       width: 150,
       sorter: true,
-      ...getColumnSearchProps('trademarkStatus'),
-      hidden: !canReadField('trademarkStatus'),
+      ...getColumnSearchProps('filingStatus'),
+      hidden: !canReadField('filingStatus'),
     },
     {
-      title: 'Sáng chế',
-      dataIndex: 'patentStatus',
-      key: 'patentStatus',
-      width: 150,
+      title: 'Ngày nộp đơn',
+      dataIndex: 'filingDate',
+      key: 'filingDate',
+      width: 120,
       sorter: true,
-      ...getColumnSearchProps('patentStatus'),
-      hidden: !canReadField('patentStatus'),
+      ...getColumnSearchProps('filingDate'),
+      hidden: !canReadField('filingDate'),
     },
     {
-      title: 'KDCN',
-      dataIndex: 'industrialDesign',
-      key: 'industrialDesign',
-      width: 150,
+      title: 'Mã đơn/Công bố/Văn bằng',
+      dataIndex: 'applicationCode',
+      key: 'applicationCode',
+      width: 200,
       sorter: true,
-      ...getColumnSearchProps('industrialDesign'),
-      hidden: !canReadField('industrialDesign'),
+      ...getColumnSearchProps('applicationCode'),
+      hidden: !canReadField('applicationCode'),
     },
     {
-      title: 'Hợp đồng',
+      title: 'Ngày cấp',
+      dataIndex: 'issueDate',
+      key: 'issueDate',
+      width: 110,
+      sorter: true,
+      ...getColumnSearchProps('issueDate'),
+      hidden: !canReadField('issueDate'),
+    },
+    {
+      title: 'Ngày hết hạn',
+      dataIndex: 'expiryDate',
+      key: 'expiryDate',
+      width: 120,
+      sorter: true,
+      ...getColumnSearchProps('expiryDate'),
+      hidden: !canReadField('expiryDate'),
+    },
+    {
+      title: 'Tình trạng xét duyệt đơn',
+      dataIndex: 'applicationReviewStatus',
+      key: 'applicationReviewStatus',
+      width: 180,
+      sorter: true,
+      ...getColumnSearchProps('applicationReviewStatus'),
+      hidden: !canReadField('applicationReviewStatus'),
+    },
+    {
+      title: 'Hạn xử lý',
+      dataIndex: 'processingDeadline',
+      key: 'processingDeadline',
+      width: 120,
+      sorter: true,
+      ...getColumnSearchProps('processingDeadline'),
+      hidden: !canReadField('processingDeadline'),
+    },
+    {
+      title: 'Chu kỳ gia hạn',
+      dataIndex: 'renewalCycle',
+      key: 'renewalCycle',
+      width: 120,
+      sorter: true,
+      ...getColumnSearchProps('renewalCycle'),
+      hidden: !canReadField('renewalCycle'),
+    },
+    {
+      title: 'Ngày cần gia hạn',
+      dataIndex: 'renewalDate',
+      key: 'renewalDate',
+      width: 130,
+      sorter: true,
+      ...getColumnSearchProps('renewalDate'),
+      hidden: !canReadField('renewalDate'),
+    },
+    {
+      title: 'Ngày nhắc hẹn (trước 3 tháng)',
+      dataIndex: 'reminderDate',
+      key: 'reminderDate',
+      width: 210,
+      sorter: true,
+      ...getColumnSearchProps('reminderDate'),
+      hidden: !canReadField('reminderDate'),
+    },
+    {
+      title: 'Trạng thái nhắc',
+      dataIndex: 'reminderStatus',
+      key: 'reminderStatus',
+      width: 130,
+      sorter: true,
+      ...getColumnSearchProps('reminderStatus'),
+      hidden: !canReadField('reminderStatus'),
+    },
+    {
+      title: 'Tình trạng hợp đồng',
       dataIndex: 'contractStatus',
       key: 'contractStatus',
       width: 150,
@@ -512,7 +597,16 @@ const Customers = () => {
       hidden: !canReadField('contractStatus'),
     },
     {
-      title: 'Giá trị HĐ',
+      title: 'Số hợp đồng',
+      dataIndex: 'contractNumber',
+      key: 'contractNumber',
+      width: 140,
+      sorter: true,
+      ...getColumnSearchProps('contractNumber'),
+      hidden: !canReadField('contractNumber'),
+    },
+    {
+      title: 'Giá trị hợp đồng',
       dataIndex: 'contractValue',
       key: 'contractValue',
       width: 150,
@@ -520,34 +614,6 @@ const Customers = () => {
       ...getColumnSearchProps('contractValue'),
       render: (val) => formatCurrency(val),
       hidden: !canReadField('contractValue'),
-    },
-    {
-      title: 'Đã thanh toán',
-      dataIndex: 'contractPaid',
-      key: 'contractPaid',
-      width: 120,
-      sorter: true,
-      ...getColumnSearchProps('contractPaid'),
-      hidden: !canReadField('contractPaid'),
-    },
-    {
-      title: 'Tổng đơn',
-      dataIndex: 'totalOrders',
-      key: 'totalOrders',
-      width: 100,
-      sorter: true,
-      ...getColumnSearchProps('totalOrders'),
-      hidden: !canReadField('totalOrders'),
-    },
-    {
-      title: 'Tổng doanh thu',
-      dataIndex: 'totalRevenue',
-      key: 'totalRevenue',
-      width: 150,
-      sorter: true,
-      ...getColumnSearchProps('totalRevenue'),
-      render: (val) => formatCurrency(val),
-      hidden: !canReadField('totalRevenue'),
     },
     {
       title: 'Ngày bắt đầu',
@@ -568,7 +634,7 @@ const Customers = () => {
       hidden: !canReadField('endDate'),
     },
     {
-      title: 'Số ngày TK',
+      title: 'Số ngày triển khai',
       dataIndex: 'implementationDays',
       key: 'implementationDays',
       width: 120,
@@ -577,57 +643,58 @@ const Customers = () => {
       hidden: !canReadField('implementationDays'),
     },
     {
-      title: 'Ngày tham gia',
-      dataIndex: 'joinDate',
-      key: 'joinDate',
+      title: 'Lệ phí nhà nước',
+      dataIndex: 'stateFee',
+      key: 'stateFee',
+      width: 140,
+      sorter: true,
+      ...getColumnSearchProps('stateFee'),
+      hidden: !canReadField('stateFee'),
+    },
+    {
+      title: 'Phí phát sinh',
+      dataIndex: 'additionalFee',
+      key: 'additionalFee',
+      width: 130,
+      sorter: true,
+      ...getColumnSearchProps('additionalFee'),
+      hidden: !canReadField('additionalFee'),
+    },
+    {
+      title: 'Người tạo',
+      dataIndex: 'createdBy',
+      key: 'createdBy',
+      width: 140,
+      sorter: true,
+      ...getColumnSearchProps('createdBy'),
+      hidden: !canReadField('createdBy'),
+    },
+    {
+      title: 'Người cập nhật',
+      dataIndex: 'updatedBy',
+      key: 'updatedBy',
+      width: 140,
+      sorter: true,
+      ...getColumnSearchProps('updatedBy'),
+      hidden: !canReadField('updatedBy'),
+    },
+    {
+      title: 'Ngày cập nhật',
+      dataIndex: 'updatedAt',
+      key: 'updatedAt',
       width: 120,
       sorter: true,
-      ...getColumnSearchProps('joinDate'),
-      hidden: !canReadField('joinDate'),
+      ...getColumnSearchProps('updatedAt'),
+      hidden: !canReadField('updatedAt'),
     },
     {
-      title: 'Tình trạng nộp đơn',
-      dataIndex: 'filingStatus',
-      key: 'filingStatus',
-      width: 150,
-      sorter: true,
-      ...getColumnSearchProps('filingStatus'),
-      hidden: !canReadField('filingStatus'),
-    },
-    {
-      title: 'Link hồ sơ',
+      title: 'Link hồ sơ giấy tờ',
       dataIndex: 'documentLink',
       key: 'documentLink',
       width: 150,
       sorter: true,
       render: (text) => text ? <a href={text} target="_blank" rel="noopener noreferrer">Xem</a> : '',
       hidden: !canReadField('documentLink'),
-    },
-    {
-      title: 'Uỷ quyền',
-      dataIndex: 'authorization',
-      key: 'authorization',
-      width: 120,
-      sorter: true,
-      ...getColumnSearchProps('authorization'),
-      hidden: !canReadField('authorization'),
-    },
-    {
-      title: 'Xét duyệt đơn',
-      dataIndex: 'applicationReviewStatus',
-      key: 'applicationReviewStatus',
-      width: 150,
-      sorter: true,
-      ...getColumnSearchProps('applicationReviewStatus'),
-      hidden: !canReadField('applicationReviewStatus'),
-    },
-    {
-      title: 'Ghi chú',
-      dataIndex: 'notes',
-      key: 'notes',
-      width: 200,
-      ...getColumnSearchProps('notes'),
-      hidden: !canReadField('notes'),
     },
     {
       title: 'Thao tác',
@@ -667,8 +734,8 @@ const Customers = () => {
           <Col span={12}>
             <Form.Item
               name="name"
-              label="Doanh nghiệp"
-              rules={[{ required: true, message: 'Vui lòng nhập tên doanh nghiệp' }]}
+              label="Tên khách hàng"
+              rules={[{ required: true, message: 'Vui lòng nhập tên khách hàng' }]}
             >
               <Input disabled={!canEditField('name')} />
             </Form.Item>
@@ -677,6 +744,7 @@ const Customers = () => {
             <Form.Item
               name="businessScale"
               label="Quy mô doanh nghiệp"
+              rules={[{ required: true, message: 'Vui lòng chọn quy mô doanh nghiệp' }]}
             >
               <Select allowClear disabled={!canEditField('businessScale')}>
                 <Option value="Siêu nhỏ">Siêu nhỏ</Option>
@@ -689,6 +757,7 @@ const Customers = () => {
             <Form.Item
               name="taxCode"
               label="Mã số thuế"
+              rules={[{ required: true, message: 'Vui lòng nhập mã số thuế' }]}
             >
               <Input disabled={!canEditField('taxCode')} />
             </Form.Item>
@@ -697,6 +766,7 @@ const Customers = () => {
             <Form.Item
               name="address"
               label="Địa chỉ"
+              rules={[{ required: true, message: 'Vui lòng nhập địa chỉ' }]}
             >
               <TextArea rows={2} disabled={!canEditField('address')} />
             </Form.Item>
@@ -705,6 +775,7 @@ const Customers = () => {
             <Form.Item
               name="representativeName"
               label="Người đại diện"
+              rules={[{ required: true, message: 'Vui lòng nhập người đại diện' }]}
             >
               <Input disabled={!canEditField('representativeName')} />
             </Form.Item>
@@ -713,6 +784,7 @@ const Customers = () => {
             <Form.Item
               name="representativePosition"
               label="Chức vụ"
+              rules={[{ required: true, message: 'Vui lòng nhập chức vụ' }]}
             >
               <Input disabled={!canEditField('representativePosition')} />
             </Form.Item>
@@ -721,6 +793,7 @@ const Customers = () => {
             <Form.Item
               name="idNumber"
               label="CCCD/Hộ chiếu"
+              rules={[{ required: true, message: 'Vui lòng nhập CCCD/Hộ chiếu' }]}
             >
               <Input disabled={!canEditField('idNumber')} />
             </Form.Item>
@@ -729,6 +802,7 @@ const Customers = () => {
             <Form.Item
               name="phone"
               label="Số điện thoại"
+              rules={[{ required: true, message: 'Vui lòng nhập số điện thoại' }]}
             >
               <Input disabled={!canEditField('phone')} />
             </Form.Item>
@@ -737,7 +811,10 @@ const Customers = () => {
             <Form.Item
               name="email"
               label="Email"
-              rules={[{ type: 'email', message: 'Email không hợp lệ' }]}
+              rules={[
+                { required: true, message: 'Vui lòng nhập email' },
+                { type: 'email', message: 'Email không hợp lệ' },
+              ]}
             >
               <Input disabled={!canEditField('email')} />
             </Form.Item>
@@ -746,6 +823,7 @@ const Customers = () => {
             <Form.Item
               name="contactPerson"
               label="Người liên hệ"
+              rules={[{ required: true, message: 'Vui lòng nhập người liên hệ' }]}
             >
               <Input disabled={!canEditField('contactPerson')} />
             </Form.Item>
@@ -754,6 +832,7 @@ const Customers = () => {
             <Form.Item
               name="contactPhone"
               label="SĐT người liên hệ"
+              rules={[{ required: true, message: 'Vui lòng nhập SĐT người liên hệ' }]}
             >
               <Input disabled={!canEditField('contactPhone')} />
             </Form.Item>
@@ -762,7 +841,10 @@ const Customers = () => {
             <Form.Item
               name="contactEmail"
               label="Email người liên hệ"
-              rules={[{ type: 'email', message: 'Email không hợp lệ' }]}
+              rules={[
+                { required: true, message: 'Vui lòng nhập email người liên hệ' },
+                { type: 'email', message: 'Email không hợp lệ' },
+              ]}
             >
               <Input disabled={!canEditField('contactEmail')} />
             </Form.Item>
@@ -810,6 +892,7 @@ const Customers = () => {
                 <Option value="Mức 2">Mức 2</Option>
                 <Option value="Mức 3">Mức 3</Option>
                 <Option value="Mức 4">Mức 4</Option>
+                <Option value="Mức 5">Mức 5</Option>
               </Select>
             </Form.Item>
           </Col>
@@ -823,6 +906,10 @@ const Customers = () => {
                 <Option value="Vãng lai">Vãng lai</Option>
                 <Option value="Đối tác">Đối tác</Option>
                 <Option value="Sự kiện">Sự kiện</Option>
+                <Option value="Marketing">Marketing</Option>
+                <Option value="Website">Website</Option>
+                <Option value="Tiktok">Tiktok</Option>
+                <Option value="Facebook">Facebook</Option>
               </Select>
             </Form.Item>
           </Col>
@@ -1101,7 +1188,6 @@ const Customers = () => {
             <Form.Item
               name="startDate"
               label="Ngày bắt đầu"
-              rules={[{ required: true, message: 'Vui lòng chọn ngày bắt đầu' }]}
             >
               <DatePicker style={{ width: '100%' }} disabled={!canEditField('startDate')} />
             </Form.Item>

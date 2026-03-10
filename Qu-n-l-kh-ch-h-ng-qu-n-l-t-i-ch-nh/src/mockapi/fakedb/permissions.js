@@ -195,6 +195,7 @@ export const qlcpFields = [
 export const initialPermissions = {
   qlkh: {},
   qlcp: {},
+  scheduling: {},
 };
 
 // Helper to initialize permissions

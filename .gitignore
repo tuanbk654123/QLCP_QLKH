@@ -41,6 +41,10 @@ pnpm-debug.log*
 .env.local
 .env.*.local
 
+# NuGet package cache (local)
+.nuget/
+**/.nuget/
+
 # Backend Specific (covering BE_QLKH if root ignores apply)
 **/bin/
 **/obj/

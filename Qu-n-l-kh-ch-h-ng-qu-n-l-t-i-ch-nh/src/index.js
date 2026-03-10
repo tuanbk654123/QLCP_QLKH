@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './config/api';
+import './mockapi';
 import App from './App';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
