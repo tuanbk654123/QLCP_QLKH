@@ -700,6 +700,34 @@ mock.onGet('/api/permissions').reply(() => {
   }];
 });
 
+mock.onGet('/api/permissions/current').reply((config) => {
+  const currentUser = getCurrentUser();
+  if (!currentUser) {
+    return [401, { message: 'Chưa đăng nhập' }];
+  }
+
+  const moduleKey = config.params?.module;
+  if (!moduleKey) {
+    return [400, { message: 'Thiếu tham số module' }];
+  }
+
+  const modulePermissions = currentPermissions?.[moduleKey];
+  if (!modulePermissions || typeof modulePermissions !== 'object') {
+    return [200, { permissions: {} }];
+  }
+
+  const roleKey = currentUser.role;
+  const flattened = {};
+  Object.keys(modulePermissions).forEach((fieldKey) => {
+    const roleMap = modulePermissions[fieldKey];
+    if (roleMap && typeof roleMap === 'object') {
+      flattened[fieldKey] = roleMap[roleKey] ?? 'R';
+    }
+  });
+
+  return [200, { permissions: flattened }];
+});
+
 mock.onPost('/api/permissions').reply((config) => {
   const newPermissions = JSON.parse(config.data);
   currentPermissions = newPermissions;
