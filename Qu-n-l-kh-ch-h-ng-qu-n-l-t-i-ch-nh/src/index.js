@@ -1,8 +1,11 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './config/api';
-import './mockapi';
 import App from './App';
+
+if (process.env.REACT_APP_USE_MOCK_API === 'true') {
+  require('./mockapi');
+}
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
