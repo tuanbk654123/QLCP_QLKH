@@ -118,6 +118,12 @@ Module hỗ trợ tạo file Word hàng loạt từ mẫu (template) có sẵn.
 *   **Quy trình sử dụng**:
     1.  Chọn **Thêm template** (nếu cần xuất nhiều loại văn bản khác nhau).
     2.  Tải file mẫu `.docx` lên.
+
+---
+
+## Deploy HTTPS (Docker Compose)
+
+Xem hướng dẫn: [DEPLOY_HTTPS.md](file:///c:/Users/NMT/Desktop/New%20folder/QLCP_QLKH/DEPLOY_HTTPS.md)
     3.  Thêm các dòng dữ liệu (Data Set).
     4.  Nhập giá trị cho từng trường tương ứng với từ khóa trong file mẫu.
     5.  Nhấn nút **Xuất file** để tải về kết quả.

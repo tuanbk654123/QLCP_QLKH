@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Table,
   Input,
@@ -28,7 +28,7 @@ import { handleApiError } from '../../utils/errorHelper';
 import './index.css';
 
 const Customers = () => {
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
@@ -44,6 +44,8 @@ const Customers = () => {
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [form] = Form.useForm();
   const [activeTab, setActiveTab] = useState('1');
+  const [isImplementationDaysManual, setIsImplementationDaysManual] = useState(false);
+  const isAutoSettingImplementationDaysRef = useRef(false);
 
   const onFinishFailed = ({ errorFields }) => {
     if (errorFields.length > 0) {
@@ -200,12 +202,23 @@ const Customers = () => {
     setEditingCustomer(null);
     form.resetFields();
     setActiveTab('1');
+    setIsImplementationDaysManual(false);
+    const actorId = user?.id;
+    const actorName = user?.fullName || user?.username || '';
+    form.setFieldsValue({
+      createdBy: actorId,
+      createdByName: actorName,
+      updatedBy: actorId,
+      updatedByName: actorName,
+      updatedAt: dayjs(),
+    });
     setIsModalVisible(true);
   };
 
   const handleEdit = (record) => {
     setEditingCustomer(record);
     setActiveTab('1');
+    setIsImplementationDaysManual(false);
     const formattedRecord = {
       ...record,
       startDate: record.startDate ? dayjs(record.startDate) : null,
@@ -216,8 +229,10 @@ const Customers = () => {
       processingDeadline: record.processingDeadline ? dayjs(record.processingDeadline) : null,
       renewalDate: record.renewalDate ? dayjs(record.renewalDate) : null,
       reminderDate: record.reminderDate ? dayjs(record.reminderDate) : null,
-      updatedAt: record.updatedAt ? dayjs(record.updatedAt) : null,
+      updatedAt: record.updatedAt ? dayjs(record.updatedAt) : dayjs(),
     };
+    formattedRecord.createdByName = record.createdByName || '';
+    formattedRecord.updatedByName = record.updatedByName || '';
     form.setFieldsValue(formattedRecord);
     setIsModalVisible(true);
   };
@@ -236,19 +251,24 @@ const Customers = () => {
     try {
       const formattedValues = {
         ...values,
-        startDate: values.startDate ? values.startDate.format('YYYY-MM-DD') : null,
-        endDate: values.endDate ? values.endDate.format('YYYY-MM-DD') : null,
-        filingDate: values.filingDate ? values.filingDate.format('YYYY-MM-DD') : null,
-        issueDate: values.issueDate ? values.issueDate.format('YYYY-MM-DD') : null,
-        expiryDate: values.expiryDate ? values.expiryDate.format('YYYY-MM-DD') : null,
-        processingDeadline: values.processingDeadline ? values.processingDeadline.format('YYYY-MM-DD') : null,
-        renewalDate: values.renewalDate ? values.renewalDate.format('YYYY-MM-DD') : null,
-        reminderDate: values.reminderDate ? values.reminderDate.format('YYYY-MM-DD') : null,
-        updatedAt: values.updatedAt ? values.updatedAt.format('YYYY-MM-DD') : null,
+        startDate: values.startDate ? values.startDate.format('YYYY-MM-DD') : undefined,
+        endDate: values.endDate ? values.endDate.format('YYYY-MM-DD') : undefined,
+        filingDate: values.filingDate ? values.filingDate.format('YYYY-MM-DD') : undefined,
+        issueDate: values.issueDate ? values.issueDate.format('YYYY-MM-DD') : undefined,
+        expiryDate: values.expiryDate ? values.expiryDate.format('YYYY-MM-DD') : undefined,
+        processingDeadline: values.processingDeadline ? values.processingDeadline.format('YYYY-MM-DD') : undefined,
+        renewalDate: values.renewalDate ? values.renewalDate.format('YYYY-MM-DD') : undefined,
+        reminderDate: values.reminderDate ? values.reminderDate.format('YYYY-MM-DD') : undefined,
       };
 
       // Remove export replacements from payload
       delete formattedValues.replacements;
+      delete formattedValues.createdBy;
+      delete formattedValues.createdByName;
+      delete formattedValues.createdAt;
+      delete formattedValues.updatedBy;
+      delete formattedValues.updatedByName;
+      delete formattedValues.updatedAt;
 
       if (editingCustomer) {
         await axios.put(`/api/customers/${editingCustomer.id}`, formattedValues);
@@ -271,6 +291,18 @@ const Customers = () => {
   };
 
   const columns = [
+    {
+      title: 'STT',
+      key: 'stt',
+      width: 70,
+      fixed: 'left',
+      align: 'center',
+      render: (_, __, index) => {
+        const current = tableParams.pagination?.current ?? 1;
+        const pageSize = tableParams.pagination?.pageSize ?? 10;
+        return (current - 1) * pageSize + index + 1;
+      },
+    },
     {
       title: 'Tên khách hàng',
       dataIndex: 'name',
@@ -616,6 +648,24 @@ const Customers = () => {
       hidden: !canReadField('contractValue'),
     },
     {
+      title: 'Lệ phí nhà nước',
+      dataIndex: 'stateFee',
+      key: 'stateFee',
+      width: 140,
+      sorter: true,
+      ...getColumnSearchProps('stateFee'),
+      hidden: !canReadField('stateFee'),
+    },
+    {
+      title: 'Phí phát sinh',
+      dataIndex: 'additionalFee',
+      key: 'additionalFee',
+      width: 130,
+      sorter: true,
+      ...getColumnSearchProps('additionalFee'),
+      hidden: !canReadField('additionalFee'),
+    },
+    {
       title: 'Ngày bắt đầu',
       dataIndex: 'startDate',
       key: 'startDate',
@@ -643,30 +693,13 @@ const Customers = () => {
       hidden: !canReadField('implementationDays'),
     },
     {
-      title: 'Lệ phí nhà nước',
-      dataIndex: 'stateFee',
-      key: 'stateFee',
-      width: 140,
-      sorter: true,
-      ...getColumnSearchProps('stateFee'),
-      hidden: !canReadField('stateFee'),
-    },
-    {
-      title: 'Phí phát sinh',
-      dataIndex: 'additionalFee',
-      key: 'additionalFee',
-      width: 130,
-      sorter: true,
-      ...getColumnSearchProps('additionalFee'),
-      hidden: !canReadField('additionalFee'),
-    },
-    {
       title: 'Người tạo',
       dataIndex: 'createdBy',
       key: 'createdBy',
       width: 140,
       sorter: true,
       ...getColumnSearchProps('createdBy'),
+      render: (_, record) => record.createdByName || record.createdBy,
       hidden: !canReadField('createdBy'),
     },
     {
@@ -676,6 +709,7 @@ const Customers = () => {
       width: 140,
       sorter: true,
       ...getColumnSearchProps('updatedBy'),
+      render: (_, record) => record.updatedByName || record.updatedBy,
       hidden: !canReadField('updatedBy'),
     },
     {
@@ -802,7 +836,6 @@ const Customers = () => {
             <Form.Item
               name="phone"
               label="Số điện thoại"
-              rules={[{ required: true, message: 'Vui lòng nhập số điện thoại' }]}
             >
               <Input disabled={!canEditField('phone')} />
             </Form.Item>
@@ -812,7 +845,6 @@ const Customers = () => {
               name="email"
               label="Email"
               rules={[
-                { required: true, message: 'Vui lòng nhập email' },
                 { type: 'email', message: 'Email không hợp lệ' },
               ]}
             >
@@ -867,6 +899,7 @@ const Customers = () => {
                 <Option value="Công bố">Công bố</Option>
                 <Option value="Nhãn hiệu">Nhãn hiệu</Option>
                 <Option value="Kiểu dáng công nghiệp">Kiểu dáng công nghiệp</Option>
+                <Option value="Chỉ dẫn địa lý">Chỉ dẫn địa lý</Option>
               </Select>
             </Form.Item>
           </Col>
@@ -1217,16 +1250,22 @@ const Customers = () => {
       children: (
         <Row gutter={16}>
           <Col span={12}>
+            <Form.Item name="createdBy" hidden>
+              <Input />
+            </Form.Item>
             <Form.Item
-              name="createdBy"
+              name="createdByName"
               label="Người tạo"
             >
               <Input disabled={!canEditField('createdBy')} />
             </Form.Item>
           </Col>
           <Col span={12}>
+            <Form.Item name="updatedBy" hidden>
+              <Input />
+            </Form.Item>
             <Form.Item
-              name="updatedBy"
+              name="updatedByName"
               label="Người cập nhật"
             >
               <Input disabled={!canEditField('updatedBy')} />
@@ -1305,6 +1344,7 @@ const Customers = () => {
           setIsModalVisible(false);
           form.resetFields();
           setActiveTab('1');
+          setIsImplementationDaysManual(false);
         }}
         footer={null}
         width={800}
@@ -1315,12 +1355,30 @@ const Customers = () => {
           scrollToFirstError
           onFinishFailed={onFinishFailed}
           onValuesChange={(changedValues, allValues) => {
-            if (changedValues.startDate || changedValues.endDate) {
+            if (Object.prototype.hasOwnProperty.call(changedValues, 'implementationDays')) {
+              if (!isAutoSettingImplementationDaysRef.current) {
+                setIsImplementationDaysManual(true);
+              }
+            }
+
+            if (
+              Object.prototype.hasOwnProperty.call(changedValues, 'startDate') ||
+              Object.prototype.hasOwnProperty.call(changedValues, 'endDate')
+            ) {
               const s = allValues.startDate;
               const e = allValues.endDate;
+
               if (s && e) {
                 const diff = dayjs(e).diff(dayjs(s), 'day');
-                form.setFieldsValue({ implementationDays: diff >= 0 ? diff : 0 });
+                const nextValue = diff >= 0 ? diff : 0;
+                isAutoSettingImplementationDaysRef.current = true;
+                form.setFieldsValue({ implementationDays: nextValue });
+                isAutoSettingImplementationDaysRef.current = false;
+                setIsImplementationDaysManual(false);
+              } else if (!isImplementationDaysManual) {
+                isAutoSettingImplementationDaysRef.current = true;
+                form.setFieldsValue({ implementationDays: 0 });
+                isAutoSettingImplementationDaysRef.current = false;
               }
             }
           }}

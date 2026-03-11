@@ -1,4 +1,23 @@
 services:
+  caddy:
+    image: caddy:2
+    container_name: qlkh_caddy
+    restart: always
+    environment:
+      - ACME_EMAIL=${ACME_EMAIL}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - qlkh_network
+
   mongo:
     image: mongo:latest
     container_name: qlkh_mongo
@@ -18,8 +37,6 @@ services:
       - ASPNETCORE_ENVIRONMENT=Production
       - MongoDb__ConnectionString=mongodb://mongo:27017
       - MongoDb__DatabaseName=QLKH
-    ports:
-      - "8080:8080"
     depends_on:
       - mongo
     networks:
@@ -29,8 +46,6 @@ services:
     build: ./Qu-n-l-kh-ch-h-ng-qu-n-l-t-i-ch-nh
     container_name: qlkh_frontend
     restart: always
-    ports:
-      - "80:80"
     depends_on:
       - backend
     networks:
@@ -42,3 +57,5 @@ networks:
 
 volumes:
   mongo_data:
+  caddy_data:
+  caddy_config:

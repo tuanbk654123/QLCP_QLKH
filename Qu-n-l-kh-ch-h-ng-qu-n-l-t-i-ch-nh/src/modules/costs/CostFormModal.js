@@ -442,6 +442,8 @@ const CostFormModal = ({
             >
               <Select allowClear disabled={!canEditField('department')}>
                 <Option value="Marketing">Marketing</Option>
+                <Option value="Phát triển thị trường">Phát triển thị trường</Option>
+                <Option value="Mua hàng">Mua hàng</Option>
                 <Option value="Pháp chế">Pháp chế</Option>
                 <Option value="Hành chính">Hành chính</Option>
                 <Option value="Kế toán">Kế toán</Option>
@@ -555,7 +557,7 @@ const CostFormModal = ({
                         String(option.children).toLowerCase().includes(input.toLowerCase())
                     }
                 >
-                    {users.map(u => (
+                    {(users || []).filter(u => u && u.username !== 'admin' && u.fullName !== 'Quản trị hệ thống' && u.id !== 1).map(u => (
                         <Option key={u.id} value={u.id}>
                             {`${u.fullName} (${u.username})`}
                         </Option>

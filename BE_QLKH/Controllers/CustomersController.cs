@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace BE_QLKH.Controllers;
 
@@ -13,11 +14,23 @@ namespace BE_QLKH.Controllers;
 public class CustomersController : ControllerBase
 {
     private readonly IMongoCollection<Customer> _customers;
+    private readonly IMongoCollection<User> _users;
 
     public CustomersController(IMongoClient client, IOptions<MongoDbSettings> options)
     {
         var db = client.GetDatabase(options.Value.DatabaseName);
         _customers = db.GetCollection<Customer>("customers");
+        _users = db.GetCollection<User>("users");
+    }
+
+    private int GetActorLegacyId()
+    {
+        var legacyIdClaim = User.FindFirst("legacy_id")?.Value;
+        if (legacyIdClaim != null && int.TryParse(legacyIdClaim, out var legacyId))
+        {
+            return legacyId;
+        }
+        return 0;
     }
 
     [HttpGet]
@@ -124,6 +137,20 @@ public class CustomersController : ControllerBase
             .Limit(pageSize)
             .ToListAsync();
 
+        var userIds = customers
+            .SelectMany(c => new[] { c.CreatedBy, c.UpdatedBy })
+            .Where(x => x > 0)
+            .Distinct()
+            .ToList();
+
+        var users = userIds.Count == 0
+            ? new List<User>()
+            : await _users.Find(u => userIds.Contains(u.LegacyId)).ToListAsync();
+
+        var userNameMap = users
+            .GroupBy(u => u.LegacyId)
+            .ToDictionary(g => g.Key, g => g.First().FullName);
+
         var result = customers.Select(c => new
         {
             id = c.LegacyId,
@@ -136,6 +163,10 @@ public class CustomersController : ControllerBase
             representativeName = c.RepresentativeName,
             representativePosition = c.RepresentativePosition,
             representativePhone = c.RepresentativePhone,
+            idNumber = c.IdNumber,
+            contactPerson = c.ContactPerson,
+            contactPhone = c.ContactPhone,
+            contactEmail = c.ContactEmail,
             businessNeeds = c.BusinessNeeds,
             businessScale = c.BusinessScale,
             businessIndustry = c.BusinessIndustry,
@@ -151,20 +182,41 @@ public class CustomersController : ControllerBase
             notes = c.Notes,
             productsServices = c.ProductsServices,
             ipGroup = c.IpGroup,
+            brandName = c.BrandName,
+            owner = c.Owner,
+            protectionTerritory = c.ProtectionTerritory,
             consultingStatus = c.ConsultingStatus,
             filingStatus = c.FilingStatus,
+            filingDate = c.FilingDate,
+            applicationCode = c.ApplicationCode,
+            issueDate = c.IssueDate,
+            expiryDate = c.ExpiryDate,
+            processingDeadline = c.ProcessingDeadline,
+            renewalCycle = c.RenewalCycle,
+            renewalDate = c.RenewalDate,
+            reminderDate = c.ReminderDate,
+            reminderStatus = c.ReminderStatus,
             documentLink = c.DocumentLink,
             authorization = c.Authorization,
             applicationReviewStatus = c.ApplicationReviewStatus,
             priority = c.Priority,
             contractPaid = c.ContractPaid,
+            contractNumber = c.ContractNumber,
             contractValue = c.ContractValue,
+            stateFee = c.StateFee,
+            additionalFee = c.AdditionalFee,
             startDate = c.StartDate,
             endDate = c.EndDate,
             implementationDays = c.ImplementationDays,
             potentialLevel = c.PotentialLevel,
             sourceClassification = c.SourceClassification,
-            nsnnSource = c.NsnnSource
+            nsnnSource = c.NsnnSource,
+            createdAt = c.CreatedAt,
+            createdBy = c.CreatedBy,
+            createdByName = userNameMap.TryGetValue(c.CreatedBy, out var cName) ? cName : string.Empty,
+            updatedAt = c.UpdatedAt,
+            updatedBy = c.UpdatedBy,
+            updatedByName = userNameMap.TryGetValue(c.UpdatedBy, out var uName) ? uName : string.Empty
         });
 
         return Ok(new
@@ -180,6 +232,14 @@ public class CustomersController : ControllerBase
         var customer = await _customers.Find(c => c.LegacyId == id).FirstOrDefaultAsync();
         if (customer == null) return NotFound(new { message = "Customer not found" });
 
+        var userIds = new[] { customer.CreatedBy, customer.UpdatedBy }.Where(x => x > 0).Distinct().ToList();
+        var users = userIds.Count == 0
+            ? new List<User>()
+            : await _users.Find(u => userIds.Contains(u.LegacyId)).ToListAsync();
+        var userNameMap = users
+            .GroupBy(u => u.LegacyId)
+            .ToDictionary(g => g.Key, g => g.First().FullName);
+
         return Ok(new
         {
             id = customer.LegacyId,
@@ -192,6 +252,10 @@ public class CustomersController : ControllerBase
             representativeName = customer.RepresentativeName,
             representativePosition = customer.RepresentativePosition,
             representativePhone = customer.RepresentativePhone,
+            idNumber = customer.IdNumber,
+            contactPerson = customer.ContactPerson,
+            contactPhone = customer.ContactPhone,
+            contactEmail = customer.ContactEmail,
             businessNeeds = customer.BusinessNeeds,
             businessScale = customer.BusinessScale,
             businessIndustry = customer.BusinessIndustry,
@@ -207,27 +271,55 @@ public class CustomersController : ControllerBase
             notes = customer.Notes,
             productsServices = customer.ProductsServices,
             ipGroup = customer.IpGroup,
+            brandName = customer.BrandName,
+            owner = customer.Owner,
+            protectionTerritory = customer.ProtectionTerritory,
             consultingStatus = customer.ConsultingStatus,
             filingStatus = customer.FilingStatus,
+            filingDate = customer.FilingDate,
+            applicationCode = customer.ApplicationCode,
+            issueDate = customer.IssueDate,
+            expiryDate = customer.ExpiryDate,
+            processingDeadline = customer.ProcessingDeadline,
+            renewalCycle = customer.RenewalCycle,
+            renewalDate = customer.RenewalDate,
+            reminderDate = customer.ReminderDate,
+            reminderStatus = customer.ReminderStatus,
             documentLink = customer.DocumentLink,
             authorization = customer.Authorization,
             applicationReviewStatus = customer.ApplicationReviewStatus,
             priority = customer.Priority,
             contractPaid = customer.ContractPaid,
+            contractNumber = customer.ContractNumber,
             contractValue = customer.ContractValue,
+            stateFee = customer.StateFee,
+            additionalFee = customer.AdditionalFee,
             startDate = customer.StartDate,
             endDate = customer.EndDate,
             implementationDays = customer.ImplementationDays,
             potentialLevel = customer.PotentialLevel,
             sourceClassification = customer.SourceClassification,
-            nsnnSource = customer.NsnnSource
+            nsnnSource = customer.NsnnSource,
+            createdAt = customer.CreatedAt,
+            createdBy = customer.CreatedBy,
+            createdByName = userNameMap.TryGetValue(customer.CreatedBy, out var cName) ? cName : string.Empty,
+            updatedAt = customer.UpdatedAt,
+            updatedBy = customer.UpdatedBy,
+            updatedByName = userNameMap.TryGetValue(customer.UpdatedBy, out var uName) ? uName : string.Empty
         });
     }
 
     [HttpPost]
     public async Task<ActionResult<object>> CreateCustomer([FromBody] Customer input)
     {
+        var now = DateTime.Now.ToString("yyyy-MM-dd");
+        var actorId = GetActorLegacyId();
+
         input.Id = ObjectId.GenerateNewId().ToString();
+        input.CreatedAt = now;
+        input.CreatedBy = actorId;
+        input.UpdatedAt = now;
+        input.UpdatedBy = actorId;
 
         var maxLegacyId = await _customers.Find(_ => true)
             .SortByDescending(c => c.LegacyId)
@@ -238,6 +330,9 @@ public class CustomersController : ControllerBase
 
         await _customers.InsertOneAsync(input);
 
+        var actor = actorId > 0 ? await _users.Find(u => u.LegacyId == actorId).FirstOrDefaultAsync() : null;
+        var actorName = actor?.FullName ?? string.Empty;
+
         return Ok(new
         {
             id = input.LegacyId,
@@ -250,6 +345,10 @@ public class CustomersController : ControllerBase
             representativeName = input.RepresentativeName,
             representativePosition = input.RepresentativePosition,
             representativePhone = input.RepresentativePhone,
+            idNumber = input.IdNumber,
+            contactPerson = input.ContactPerson,
+            contactPhone = input.ContactPhone,
+            contactEmail = input.ContactEmail,
             businessNeeds = input.BusinessNeeds,
             businessScale = input.BusinessScale,
             businessIndustry = input.BusinessIndustry,
@@ -265,20 +364,41 @@ public class CustomersController : ControllerBase
             notes = input.Notes,
             productsServices = input.ProductsServices,
             ipGroup = input.IpGroup,
+            brandName = input.BrandName,
+            owner = input.Owner,
+            protectionTerritory = input.ProtectionTerritory,
             consultingStatus = input.ConsultingStatus,
             filingStatus = input.FilingStatus,
+            filingDate = input.FilingDate,
+            applicationCode = input.ApplicationCode,
+            issueDate = input.IssueDate,
+            expiryDate = input.ExpiryDate,
+            processingDeadline = input.ProcessingDeadline,
+            renewalCycle = input.RenewalCycle,
+            renewalDate = input.RenewalDate,
+            reminderDate = input.ReminderDate,
+            reminderStatus = input.ReminderStatus,
             documentLink = input.DocumentLink,
             authorization = input.Authorization,
             applicationReviewStatus = input.ApplicationReviewStatus,
             priority = input.Priority,
             contractPaid = input.ContractPaid,
+            contractNumber = input.ContractNumber,
             contractValue = input.ContractValue,
+            stateFee = input.StateFee,
+            additionalFee = input.AdditionalFee,
             startDate = input.StartDate,
             endDate = input.EndDate,
             implementationDays = input.ImplementationDays,
             potentialLevel = input.PotentialLevel,
             sourceClassification = input.SourceClassification,
-            nsnnSource = input.NsnnSource
+            nsnnSource = input.NsnnSource,
+            createdAt = input.CreatedAt,
+            createdBy = input.CreatedBy,
+            createdByName = actorName,
+            updatedAt = input.UpdatedAt,
+            updatedBy = input.UpdatedBy,
+            updatedByName = actorName
         });
     }
 
@@ -288,52 +408,141 @@ public class CustomersController : ControllerBase
         var customer = await _customers.Find(c => c.LegacyId == id).FirstOrDefaultAsync();
         if (customer == null) return NotFound(new { message = "Customer not found" });
 
-        input.Id = customer.Id;
-        input.LegacyId = customer.LegacyId;
+        var now = DateTime.Now.ToString("yyyy-MM-dd");
+        var actorId = GetActorLegacyId();
 
-        await _customers.ReplaceOneAsync(c => c.Id == customer.Id, input);
+        customer.Name = input.Name ?? customer.Name;
+        customer.Email = input.Email ?? customer.Email;
+        customer.Phone = input.Phone ?? customer.Phone;
+        customer.Address = input.Address ?? customer.Address;
+        customer.Company = input.Company ?? customer.Company;
+        customer.TaxCode = input.TaxCode ?? customer.TaxCode;
+        customer.RepresentativeName = input.RepresentativeName ?? customer.RepresentativeName;
+        customer.RepresentativePosition = input.RepresentativePosition ?? customer.RepresentativePosition;
+        customer.RepresentativePhone = input.RepresentativePhone ?? customer.RepresentativePhone;
+        customer.IdNumber = input.IdNumber ?? customer.IdNumber;
+        customer.ContactPerson = input.ContactPerson ?? customer.ContactPerson;
+        customer.ContactPhone = input.ContactPhone ?? customer.ContactPhone;
+        customer.ContactEmail = input.ContactEmail ?? customer.ContactEmail;
+        customer.BusinessNeeds = input.BusinessNeeds ?? customer.BusinessNeeds;
+        customer.BusinessScale = input.BusinessScale ?? customer.BusinessScale;
+        customer.BusinessIndustry = input.BusinessIndustry ?? customer.BusinessIndustry;
+        customer.CopyrightStatus = input.CopyrightStatus ?? customer.CopyrightStatus;
+        customer.TrademarkStatus = input.TrademarkStatus ?? customer.TrademarkStatus;
+        customer.PatentStatus = input.PatentStatus ?? customer.PatentStatus;
+        customer.IndustrialDesign = input.IndustrialDesign ?? customer.IndustrialDesign;
+        customer.ContractStatus = input.ContractStatus ?? customer.ContractStatus;
+        customer.Status = input.Status ?? customer.Status;
+        customer.TotalOrders = input.TotalOrders ?? customer.TotalOrders;
+        customer.TotalRevenue = input.TotalRevenue ?? customer.TotalRevenue;
+        customer.JoinDate = input.JoinDate ?? customer.JoinDate;
+        customer.Notes = input.Notes ?? customer.Notes;
+        customer.ProductsServices = input.ProductsServices ?? customer.ProductsServices;
+        customer.IpGroup = input.IpGroup ?? customer.IpGroup;
+        customer.BrandName = input.BrandName ?? customer.BrandName;
+        customer.Owner = input.Owner ?? customer.Owner;
+        customer.ProtectionTerritory = input.ProtectionTerritory ?? customer.ProtectionTerritory;
+        customer.ConsultingStatus = input.ConsultingStatus ?? customer.ConsultingStatus;
+        customer.FilingStatus = input.FilingStatus ?? customer.FilingStatus;
+        customer.FilingDate = input.FilingDate ?? customer.FilingDate;
+        customer.ApplicationCode = input.ApplicationCode ?? customer.ApplicationCode;
+        customer.IssueDate = input.IssueDate ?? customer.IssueDate;
+        customer.ExpiryDate = input.ExpiryDate ?? customer.ExpiryDate;
+        customer.ProcessingDeadline = input.ProcessingDeadline ?? customer.ProcessingDeadline;
+        customer.RenewalCycle = input.RenewalCycle ?? customer.RenewalCycle;
+        customer.RenewalDate = input.RenewalDate ?? customer.RenewalDate;
+        customer.ReminderDate = input.ReminderDate ?? customer.ReminderDate;
+        customer.ReminderStatus = input.ReminderStatus ?? customer.ReminderStatus;
+        customer.DocumentLink = input.DocumentLink ?? customer.DocumentLink;
+        customer.Authorization = input.Authorization ?? customer.Authorization;
+        customer.ApplicationReviewStatus = input.ApplicationReviewStatus ?? customer.ApplicationReviewStatus;
+        customer.Priority = input.Priority ?? customer.Priority;
+        customer.ContractPaid = input.ContractPaid ?? customer.ContractPaid;
+        customer.ContractNumber = input.ContractNumber ?? customer.ContractNumber;
+        customer.ContractValue = input.ContractValue ?? customer.ContractValue;
+        customer.StateFee = input.StateFee ?? customer.StateFee;
+        customer.AdditionalFee = input.AdditionalFee ?? customer.AdditionalFee;
+        customer.StartDate = input.StartDate ?? customer.StartDate;
+        customer.EndDate = input.EndDate ?? customer.EndDate;
+        customer.ImplementationDays = input.ImplementationDays ?? customer.ImplementationDays;
+        customer.PotentialLevel = input.PotentialLevel ?? customer.PotentialLevel;
+        customer.SourceClassification = input.SourceClassification ?? customer.SourceClassification;
+        customer.NsnnSource = input.NsnnSource ?? customer.NsnnSource;
+
+        customer.UpdatedAt = now;
+        customer.UpdatedBy = actorId;
+
+        await _customers.ReplaceOneAsync(c => c.Id == customer.Id, customer);
+
+        var creator = customer.CreatedBy > 0 ? await _users.Find(u => u.LegacyId == customer.CreatedBy).FirstOrDefaultAsync() : null;
+        var updater = customer.UpdatedBy > 0 ? await _users.Find(u => u.LegacyId == customer.UpdatedBy).FirstOrDefaultAsync() : null;
 
         return Ok(new
         {
-            id = input.LegacyId,
-            name = input.Name,
-            email = input.Email,
-            phone = input.Phone,
-            address = input.Address,
-            company = input.Company,
-            taxCode = input.TaxCode,
-            representativeName = input.RepresentativeName,
-            representativePosition = input.RepresentativePosition,
-            representativePhone = input.RepresentativePhone,
-            businessNeeds = input.BusinessNeeds,
-            businessScale = input.BusinessScale,
-            businessIndustry = input.BusinessIndustry,
-            copyrightStatus = input.CopyrightStatus,
-            trademarkStatus = input.TrademarkStatus,
-            patentStatus = input.PatentStatus,
-            industrialDesign = input.IndustrialDesign,
-            contractStatus = input.ContractStatus,
-            status = input.Status,
-            totalOrders = input.TotalOrders,
-            totalRevenue = input.TotalRevenue,
-            joinDate = input.JoinDate,
-            notes = input.Notes,
-            productsServices = input.ProductsServices,
-            ipGroup = input.IpGroup,
-            consultingStatus = input.ConsultingStatus,
-            filingStatus = input.FilingStatus,
-            documentLink = input.DocumentLink,
-            authorization = input.Authorization,
-            applicationReviewStatus = input.ApplicationReviewStatus,
-            priority = input.Priority,
-            contractPaid = input.ContractPaid,
-            contractValue = input.ContractValue,
-            startDate = input.StartDate,
-            endDate = input.EndDate,
-            implementationDays = input.ImplementationDays,
-            potentialLevel = input.PotentialLevel,
-            sourceClassification = input.SourceClassification,
-            nsnnSource = input.NsnnSource
+            id = customer.LegacyId,
+            name = customer.Name,
+            email = customer.Email,
+            phone = customer.Phone,
+            address = customer.Address,
+            company = customer.Company,
+            taxCode = customer.TaxCode,
+            representativeName = customer.RepresentativeName,
+            representativePosition = customer.RepresentativePosition,
+            representativePhone = customer.RepresentativePhone,
+            idNumber = customer.IdNumber,
+            contactPerson = customer.ContactPerson,
+            contactPhone = customer.ContactPhone,
+            contactEmail = customer.ContactEmail,
+            businessNeeds = customer.BusinessNeeds,
+            businessScale = customer.BusinessScale,
+            businessIndustry = customer.BusinessIndustry,
+            copyrightStatus = customer.CopyrightStatus,
+            trademarkStatus = customer.TrademarkStatus,
+            patentStatus = customer.PatentStatus,
+            industrialDesign = customer.IndustrialDesign,
+            contractStatus = customer.ContractStatus,
+            status = customer.Status,
+            totalOrders = customer.TotalOrders,
+            totalRevenue = customer.TotalRevenue,
+            joinDate = customer.JoinDate,
+            notes = customer.Notes,
+            productsServices = customer.ProductsServices,
+            ipGroup = customer.IpGroup,
+            brandName = customer.BrandName,
+            owner = customer.Owner,
+            protectionTerritory = customer.ProtectionTerritory,
+            consultingStatus = customer.ConsultingStatus,
+            filingStatus = customer.FilingStatus,
+            filingDate = customer.FilingDate,
+            applicationCode = customer.ApplicationCode,
+            issueDate = customer.IssueDate,
+            expiryDate = customer.ExpiryDate,
+            processingDeadline = customer.ProcessingDeadline,
+            renewalCycle = customer.RenewalCycle,
+            renewalDate = customer.RenewalDate,
+            reminderDate = customer.ReminderDate,
+            reminderStatus = customer.ReminderStatus,
+            documentLink = customer.DocumentLink,
+            authorization = customer.Authorization,
+            applicationReviewStatus = customer.ApplicationReviewStatus,
+            priority = customer.Priority,
+            contractPaid = customer.ContractPaid,
+            contractNumber = customer.ContractNumber,
+            contractValue = customer.ContractValue,
+            stateFee = customer.StateFee,
+            additionalFee = customer.AdditionalFee,
+            startDate = customer.StartDate,
+            endDate = customer.EndDate,
+            implementationDays = customer.ImplementationDays,
+            potentialLevel = customer.PotentialLevel,
+            sourceClassification = customer.SourceClassification,
+            nsnnSource = customer.NsnnSource,
+            createdAt = customer.CreatedAt,
+            createdBy = customer.CreatedBy,
+            createdByName = creator?.FullName ?? string.Empty,
+            updatedAt = customer.UpdatedAt,
+            updatedBy = customer.UpdatedBy,
+            updatedByName = updater?.FullName ?? string.Empty
         });
     }
 
