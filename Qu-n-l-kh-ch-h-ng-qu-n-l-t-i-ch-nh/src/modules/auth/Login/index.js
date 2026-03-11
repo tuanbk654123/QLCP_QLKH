@@ -58,13 +58,6 @@ const Login = () => {
             </Button>
           </Form.Item>
         </Form>
-
-        <div className="login-info">
-          <p><strong>Thông tin đăng nhập mẫu (Mật khẩu: 123456):</strong></p>
-          <p>Admin: <code>admin</code> | CEO: <code>ceo</code></p>
-          <p>Quản lý: <code>manager</code> | Kế toán: <code>accountant</code></p>
-          <p>Sale: <code>sales</code> | Chuyên viên: <code>executive</code></p>
-        </div>
       </Card>
     </div>
   );

@@ -35,7 +35,7 @@ const ROLE_OPTIONS = [
   { value: 'director', label: 'Giám đốc' },
   { value: 'ceo', label: 'Tổng giám đốc' },
   { value: 'accountant', label: 'Kế toán' },
-  { value: 'admin', label: 'Hành chính' },
+  { value: 'admin', label: 'Admin' },
 ];
 
 const ROLE_LABELS = ROLE_OPTIONS.reduce((acc, r) => {
