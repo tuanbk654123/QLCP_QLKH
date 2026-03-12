@@ -1,10 +1,12 @@
 using BE_QLKH.Models;
+using BE_QLKH.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using System.IdentityModel.Tokens.Jwt;
+using System.Text.Json;
 
 namespace BE_QLKH.Controllers;
 
@@ -15,12 +17,14 @@ public class CustomersController : ControllerBase
 {
     private readonly IMongoCollection<Customer> _customers;
     private readonly IMongoCollection<User> _users;
+    private readonly IAuditLogService _auditLogService;
 
-    public CustomersController(IMongoClient client, IOptions<MongoDbSettings> options)
+    public CustomersController(IMongoClient client, IOptions<MongoDbSettings> options, IAuditLogService auditLogService)
     {
         var db = client.GetDatabase(options.Value.DatabaseName);
         _customers = db.GetCollection<Customer>("customers");
         _users = db.GetCollection<User>("users");
+        _auditLogService = auditLogService;
     }
 
     private int GetActorLegacyId()
@@ -332,6 +336,7 @@ public class CustomersController : ControllerBase
 
         var actor = actorId > 0 ? await _users.Find(u => u.LegacyId == actorId).FirstOrDefaultAsync() : null;
         var actorName = actor?.FullName ?? string.Empty;
+        await _auditLogService.LogAsync("customer", input.LegacyId, "create", actor, null, input);
 
         return Ok(new
         {
@@ -408,6 +413,8 @@ public class CustomersController : ControllerBase
         var customer = await _customers.Find(c => c.LegacyId == id).FirstOrDefaultAsync();
         if (customer == null) return NotFound(new { message = "Customer not found" });
 
+        var before = JsonSerializer.Deserialize<Customer>(JsonSerializer.Serialize(customer)) ?? customer;
+
         var now = DateTime.Now.ToString("yyyy-MM-dd");
         var actorId = GetActorLegacyId();
 
@@ -476,6 +483,7 @@ public class CustomersController : ControllerBase
 
         var creator = customer.CreatedBy > 0 ? await _users.Find(u => u.LegacyId == customer.CreatedBy).FirstOrDefaultAsync() : null;
         var updater = customer.UpdatedBy > 0 ? await _users.Find(u => u.LegacyId == customer.UpdatedBy).FirstOrDefaultAsync() : null;
+        await _auditLogService.LogAsync("customer", customer.LegacyId, "update", updater, before, customer);
 
         return Ok(new
         {
@@ -549,8 +557,15 @@ public class CustomersController : ControllerBase
     [HttpDelete("{id:int}")]
     public async Task<ActionResult<object>> DeleteCustomer(int id)
     {
+        var customer = await _customers.Find(c => c.LegacyId == id).FirstOrDefaultAsync();
+        if (customer == null) return NotFound(new { message = "Customer not found" });
+
+        var actorId = GetActorLegacyId();
+        var actor = actorId > 0 ? await _users.Find(u => u.LegacyId == actorId).FirstOrDefaultAsync() : null;
+
         var result = await _customers.DeleteOneAsync(c => c.LegacyId == id);
         if (result.DeletedCount == 0) return NotFound(new { message = "Customer not found" });
+        await _auditLogService.LogAsync("customer", id, "delete", actor, customer, null);
         return Ok(new { message = "Customer deleted" });
     }
 }

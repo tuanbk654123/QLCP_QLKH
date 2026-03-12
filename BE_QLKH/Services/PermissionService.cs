@@ -30,12 +30,13 @@ public class PermissionService : IPermissionService
             Label = r.Name
         }).ToList();
 
-        var qlkhFields = fields.Where(f => f.ModuleCode == "qlkh").ToList();
-        var qlcpFields = fields.Where(f => f.ModuleCode == "qlcp").ToList();
+        var qlkhFields = fields.Where(f => f.ModuleCode == "qlkh" && f.Code != "auditLog").ToList();
+        var qlcpFields = fields.Where(f => f.ModuleCode == "qlcp" && f.Code != "auditLog").ToList();
         var userFields = fields.Where(f => f.ModuleCode == "users").ToList();
         var dashboardFields = fields.Where(f => f.ModuleCode == "dashboard").ToList();
         var exportFields = fields.Where(f => f.ModuleCode == "export").ToList();
         var schedulingFields = fields.Where(f => f.ModuleCode == "scheduling").ToList();
+        var auditFields = fields.Where(f => f.ModuleCode == "audit").ToList();
 
         var qlkhGroups = BuildFieldGroups(qlkhFields);
         var qlcpGroups = BuildFieldGroups(qlcpFields);
@@ -43,6 +44,7 @@ public class PermissionService : IPermissionService
         var dashboardGroups = BuildFieldGroups(dashboardFields);
         var exportGroups = BuildFieldGroups(exportFields);
         var schedulingGroups = BuildFieldGroups(schedulingFields);
+        var auditGroups = BuildFieldGroups(auditFields);
 
         var qlkhPerm = BuildPermissionMap("qlkh", qlkhFields, roles, fieldPermissions);
         var qlcpPerm = BuildPermissionMap("qlcp", qlcpFields, roles, fieldPermissions);
@@ -50,6 +52,7 @@ public class PermissionService : IPermissionService
         var dashboardPerm = BuildPermissionMap("dashboard", dashboardFields, roles, fieldPermissions);
         var exportPerm = BuildPermissionMap("export", exportFields, roles, fieldPermissions);
         var schedulingPerm = BuildPermissionMap("scheduling", schedulingFields, roles, fieldPermissions);
+        var auditPerm = BuildPermissionMap("audit", auditFields, roles, fieldPermissions);
 
         return new PermissionMatrixDto
         {
@@ -60,12 +63,14 @@ public class PermissionService : IPermissionService
             DashboardFields = dashboardGroups,
             ExportFields = exportGroups,
             SchedulingFields = schedulingGroups,
+            AuditFields = auditGroups,
             QlkhPermissions = qlkhPerm,
             QlcpPermissions = qlcpPerm,
             UserPermissions = userPerm,
             DashboardPermissions = dashboardPerm,
             ExportPermissions = exportPerm,
-            SchedulingPermissions = schedulingPerm
+            SchedulingPermissions = schedulingPerm,
+            AuditPermissions = auditPerm
         };
     }
 

@@ -22,7 +22,7 @@ export const AuthProvider = ({ children }) => {
 
   const loadModulePermissions = async () => {
     try {
-      const modules = ['users', 'dashboard', 'qlkh', 'export'];
+      const modules = ['users', 'dashboard', 'qlkh', 'qlcp', 'export', 'scheduling', 'audit'];
       const results = await Promise.all(
         modules.map((module) =>
           axios
@@ -135,6 +135,14 @@ export const AuthProvider = ({ children }) => {
     return user && (user.role === 'admin' || user.role === 'ceo');
   };
 
+  const canAccessAuditLogs = () => {
+    if (!user) return false;
+    if (isAdmin()) return true;
+
+    const level = getPermissionLevel('audit', 'view');
+    return level && level !== 'N';
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -148,6 +156,7 @@ export const AuthProvider = ({ children }) => {
         getPermissionLevel,
         canAccessUsersModule,
         canAccessPermissions,
+        canAccessAuditLogs,
         checkAuth,
       }}
     >

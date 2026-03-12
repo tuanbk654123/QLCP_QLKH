@@ -20,7 +20,9 @@ public class DatabaseSeeder : IHostedService
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        var db = _client.GetDatabase(_settings.DatabaseName);
+        try
+        {
+            var db = _client.GetDatabase(_settings.DatabaseName);
 
         var existingCollections = await db.ListCollectionNames().ToListAsync(cancellationToken);
 
@@ -39,6 +41,9 @@ public class DatabaseSeeder : IHostedService
         await EnsureCollection("modules");
         await EnsureCollection("fields");
         await EnsureCollection("field_permissions");
+        await EnsureCollection("nsnn_sources");
+        await EnsureCollection("project_codes");
+        await EnsureCollection("audit_logs");
 
         var usersCollection = db.GetCollection<User>("users");
         if (await usersCollection.CountDocumentsAsync(_ => true, cancellationToken: cancellationToken) == 0)
@@ -162,6 +167,39 @@ public class DatabaseSeeder : IHostedService
             };
 
             await usersCollection.InsertManyAsync(defaultUsers, cancellationToken: cancellationToken);
+        }
+
+        var nsnnSourcesCollection = db.GetCollection<NsnnSource>("nsnn_sources");
+        if (await nsnnSourcesCollection.CountDocumentsAsync(_ => true, cancellationToken: cancellationToken) == 0)
+        {
+            var today = DateTime.Now.ToString("yyyy-MM-dd");
+            var nsnnSources = new List<NsnnSource>
+            {
+                new NsnnSource { Id = ObjectId.GenerateNewId().ToString(), LegacyId = 1, Name = "TACs", CreatedAt = today, UpdatedAt = today },
+                new NsnnSource { Id = ObjectId.GenerateNewId().ToString(), LegacyId = 2, Name = "Sở TC Huế", CreatedAt = today, UpdatedAt = today },
+                new NsnnSource { Id = ObjectId.GenerateNewId().ToString(), LegacyId = 3, Name = "Sở CT Quảng Trị", CreatedAt = today, UpdatedAt = today },
+                new NsnnSource { Id = ObjectId.GenerateNewId().ToString(), LegacyId = 4, Name = "Sở CT Hậu Giang", CreatedAt = today, UpdatedAt = today },
+                new NsnnSource { Id = ObjectId.GenerateNewId().ToString(), LegacyId = 5, Name = "Chi cục PTNT Lâm Đồng", CreatedAt = today, UpdatedAt = today },
+            };
+
+            await nsnnSourcesCollection.InsertManyAsync(nsnnSources, cancellationToken: cancellationToken);
+        }
+
+        var projectCodesCollection = db.GetCollection<ProjectCode>("project_codes");
+        if (await projectCodesCollection.CountDocumentsAsync(_ => true, cancellationToken: cancellationToken) == 0)
+        {
+            var today = DateTime.Now.ToString("yyyy-MM-dd");
+            var projectCodes = new List<ProjectCode>
+            {
+                new ProjectCode { Id = ObjectId.GenerateNewId().ToString(), LegacyId = 1, Code = "TACs25ND80", CreatedAt = today, UpdatedAt = today },
+                new ProjectCode { Id = ObjectId.GenerateNewId().ToString(), LegacyId = 2, Code = "STCHue25ND80", CreatedAt = today, UpdatedAt = today },
+                new ProjectCode { Id = ObjectId.GenerateNewId().ToString(), LegacyId = 3, Code = "SCTQTri25ND80", CreatedAt = today, UpdatedAt = today },
+                new ProjectCode { Id = ObjectId.GenerateNewId().ToString(), LegacyId = 4, Code = "SCTCT25ND80", CreatedAt = today, UpdatedAt = today },
+                new ProjectCode { Id = ObjectId.GenerateNewId().ToString(), LegacyId = 5, Code = "SNNLD25MTQG", CreatedAt = today, UpdatedAt = today },
+                new ProjectCode { Id = ObjectId.GenerateNewId().ToString(), LegacyId = 6, Code = "Dịch vụ SHTT", CreatedAt = today, UpdatedAt = today },
+            };
+
+            await projectCodesCollection.InsertManyAsync(projectCodes, cancellationToken: cancellationToken);
         }
 
         var customersCollection = db.GetCollection<Customer>("customers");
@@ -1004,7 +1042,8 @@ public class DatabaseSeeder : IHostedService
                 new ModuleDef { Code = "dashboard", Name = "Dashboard", IsActive = true },
                 new ModuleDef { Code = "users", Name = "Quản lý nhân viên", IsActive = true },
                 new ModuleDef { Code = "export", Name = "Xuất văn bản", IsActive = true },
-                new ModuleDef { Code = "scheduling", Name = "Chấm công dự án", IsActive = true }
+                new ModuleDef { Code = "scheduling", Name = "Chấm công dự án", IsActive = true },
+                new ModuleDef { Code = "audit", Name = "Lịch sử tác động", IsActive = true }
             };
 
             await modulesCollection.InsertManyAsync(defaultModules, cancellationToken: cancellationToken);
@@ -1016,6 +1055,12 @@ public class DatabaseSeeder : IHostedService
              if (schedMod == null)
              {
                  await modulesCollection.InsertOneAsync(new ModuleDef { Code = "scheduling", Name = "Chấm công dự án", IsActive = true }, cancellationToken: cancellationToken);
+             }
+
+             var auditMod = await modulesCollection.Find(m => m.Code == "audit").FirstOrDefaultAsync(cancellationToken);
+             if (auditMod == null)
+             {
+                 await modulesCollection.InsertOneAsync(new ModuleDef { Code = "audit", Name = "Lịch sử tác động", IsActive = true }, cancellationToken: cancellationToken);
              }
         }
 
@@ -1421,6 +1466,124 @@ public class DatabaseSeeder : IHostedService
             );
         }
 
+        var qlkhAuditField = new FieldDef
+        {
+            ModuleCode = "qlkh",
+            Code = "auditLog",
+            Label = "Lịch sử tác động",
+            GroupCode = "group_system",
+            GroupLabel = "VII. Hệ thống – kiểm soát",
+            OrderIndex = 5
+        };
+
+        var existingQlkhAudit = await fieldsCollection.Find(f => f.ModuleCode == "qlkh" && f.Code == "auditLog").FirstOrDefaultAsync(cancellationToken);
+        if (existingQlkhAudit != null)
+        {
+            qlkhAuditField.Id = existingQlkhAudit.Id;
+            await fieldsCollection.ReplaceOneAsync(f => f.Id == existingQlkhAudit.Id, qlkhAuditField, new ReplaceOptions { IsUpsert = true }, cancellationToken);
+        }
+        else
+        {
+            qlkhAuditField.Id = ObjectId.GenerateNewId().ToString();
+            await fieldsCollection.InsertOneAsync(qlkhAuditField, cancellationToken: cancellationToken);
+        }
+
+        var qlcpAuditField = new FieldDef
+        {
+            ModuleCode = "qlcp",
+            Code = "auditLog",
+            Label = "Lịch sử tác động",
+            GroupCode = "group_control",
+            GroupLabel = "VI. Nhóm phê duyệt – kiểm soát",
+            OrderIndex = 99
+        };
+
+        var existingQlcpAudit = await fieldsCollection.Find(f => f.ModuleCode == "qlcp" && f.Code == "auditLog").FirstOrDefaultAsync(cancellationToken);
+        if (existingQlcpAudit != null)
+        {
+            qlcpAuditField.Id = existingQlcpAudit.Id;
+            await fieldsCollection.ReplaceOneAsync(f => f.Id == existingQlcpAudit.Id, qlcpAuditField, new ReplaceOptions { IsUpsert = true }, cancellationToken);
+        }
+        else
+        {
+            qlcpAuditField.Id = ObjectId.GenerateNewId().ToString();
+            await fieldsCollection.InsertOneAsync(qlcpAuditField, cancellationToken: cancellationToken);
+        }
+
+        var auditPerms = new List<(string ModuleCode, string RoleCode, string Level)>
+        {
+            ("qlkh", "marketing_sales", "R"),
+            ("qlkh", "ip_executive", "R"),
+            ("qlkh", "ip_manager", "R"),
+            ("qlkh", "accountant", "N"),
+            ("qlkh", "director", "R"),
+            ("qlkh", "ceo", "A"),
+            ("qlkh", "admin", "A"),
+
+            ("qlcp", "marketing_sales", "R"),
+            ("qlcp", "ip_executive", "R"),
+            ("qlcp", "ip_manager", "R"),
+            ("qlcp", "accountant", "R"),
+            ("qlcp", "director", "R"),
+            ("qlcp", "ceo", "A"),
+            ("qlcp", "admin", "A"),
+        };
+
+        foreach (var (moduleCode, roleCode, level) in auditPerms)
+        {
+            var permUpdate = Builders<FieldPermission>.Update.Set(p => p.PermissionLevel, level);
+            await fpCollection.UpdateOneAsync(
+                p => p.ModuleCode == moduleCode && p.FieldCode == "auditLog" && p.RoleCode == roleCode,
+                permUpdate,
+                new UpdateOptions { IsUpsert = true },
+                cancellationToken
+            );
+        }
+
+        var auditViewField = new FieldDef
+        {
+            ModuleCode = "audit",
+            Code = "view",
+            Label = "Xem lịch sử tác động",
+            GroupCode = "group_audit",
+            GroupLabel = "I. Lịch sử tác động",
+            OrderIndex = 1
+        };
+
+        var existingAuditView = await fieldsCollection.Find(f => f.ModuleCode == "audit" && f.Code == "view").FirstOrDefaultAsync(cancellationToken);
+        if (existingAuditView != null)
+        {
+            auditViewField.Id = existingAuditView.Id;
+            await fieldsCollection.ReplaceOneAsync(f => f.Id == existingAuditView.Id, auditViewField, new ReplaceOptions { IsUpsert = true }, cancellationToken);
+        }
+        else
+        {
+            auditViewField.Id = ObjectId.GenerateNewId().ToString();
+            await fieldsCollection.InsertOneAsync(auditViewField, cancellationToken: cancellationToken);
+        }
+
+        var auditViewPerms = new List<(string RoleCode, string Level)>
+        {
+            ("marketing_sales", "N"),
+            ("ip_executive", "N"),
+            ("ip_manager", "R"),
+            ("accountant", "N"),
+            ("director", "R"),
+            ("ceo", "R"),
+            ("admin", "A"),
+        };
+
+        foreach (var (roleCode, level) in auditViewPerms)
+        {
+            var permUpdate = Builders<FieldPermission>.Update.Set(p => p.PermissionLevel, level);
+            await fpCollection.UpdateOneAsync(
+                p => p.ModuleCode == "audit" && p.FieldCode == "view" && p.RoleCode == roleCode,
+                permUpdate,
+                new UpdateOptions { IsUpsert = true },
+                cancellationToken
+            );
+        }
+
         Console.WriteLine("--- CHECKING 2026 DATA ---");
 
         // 7. Supplement Data for 2026 (Customers and Costs) to make charts look full
@@ -1637,12 +1800,16 @@ public class DatabaseSeeder : IHostedService
              }
         }
 
-        // Ensure manager email is updated (Fix for existing data)
-        var managerUser = await usersCollection.Find(u => u.Username == "manager").FirstOrDefaultAsync(cancellationToken);
-        if (managerUser != null && managerUser.Email != "tuanvb96@gmail.com")
+            // Ensure manager email is updated (Fix for existing data)
+            var managerUser = await usersCollection.Find(u => u.Username == "manager").FirstOrDefaultAsync(cancellationToken);
+            if (managerUser != null && managerUser.Email != "tuanvb96@gmail.com")
+            {
+                var update = Builders<User>.Update.Set(u => u.Email, "tuanvb96@gmail.com");
+                await usersCollection.UpdateOneAsync(u => u.Id == managerUser.Id, update, cancellationToken: cancellationToken);
+            }
+        }
+        catch
         {
-            var update = Builders<User>.Update.Set(u => u.Email, "tuanvb96@gmail.com");
-            await usersCollection.UpdateOneAsync(u => u.Id == managerUser.Id, update, cancellationToken: cancellationToken);
         }
     }
 

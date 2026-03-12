@@ -7,7 +7,7 @@
 
 ## Biến môi trường
 
-Tạo file `.env` cùng cấp với `docker-compose.yml`:
+Khuyến nghị tạo file `.env` cùng cấp với `docker-compose.yml` để Let’s Encrypt có email liên hệ (không bắt buộc):
 
 ```
 ACME_EMAIL=you@example.com
@@ -23,4 +23,3 @@ docker compose up -d --build
 
 - Web: https://crm.anneco.vn
 - API: https://crm.anneco.vn/api/swagger
-

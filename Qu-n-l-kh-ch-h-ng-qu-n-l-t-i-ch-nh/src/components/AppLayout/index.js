@@ -16,6 +16,7 @@ import {
   MenuUnfoldOutlined,
   MenuFoldOutlined,
   CalendarOutlined,
+  HistoryOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../context/AuthContext';
 import { useNotification } from '../../context/NotificationContext';
@@ -38,7 +39,7 @@ const AppLayout = ({ children }) => {
   }, [location.pathname]);
 
   const isMobile = !screens.lg;
-  const { user, logout, canAccessUsersModule, canAccessPermissions, getPermissionLevel, isAdmin } = useAuth();
+  const { user, logout, canAccessUsersModule, canAccessPermissions, canAccessAuditLogs, getPermissionLevel, isAdmin } = useAuth();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotification();
   const [visible, setVisible] = useState(false);
 
@@ -134,6 +135,14 @@ const AppLayout = ({ children }) => {
         label: 'Chấm công dự án',
       },
     ];
+
+    if (canAccessAuditLogs()) {
+      items.push({
+        key: '/audit-logs',
+        icon: <HistoryOutlined />,
+        label: 'Lịch sử tác động',
+      });
+    }
 
     const exportDocPerm = getPermissionLevel('export', 'export_doc');
     if (exportDocPerm && exportDocPerm !== 'N') {

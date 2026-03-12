@@ -25,13 +25,15 @@ public class CostsController : ControllerBase
     private readonly IHubContext<NotificationsHub> _hubContext;
     private readonly ILogger<CostsController> _logger;
     private readonly IEmailService _emailService;
+    private readonly IAuditLogService _auditLogService;
 
     public CostsController(
         IMongoClient client, 
         IOptions<MongoDbSettings> options,
         IHubContext<NotificationsHub> hubContext,
         ILogger<CostsController> logger,
-        IEmailService emailService)
+        IEmailService emailService,
+        IAuditLogService auditLogService)
     {
         var db = client.GetDatabase(options.Value.DatabaseName);
         _costs = db.GetCollection<Cost>("costs");
@@ -40,6 +42,7 @@ public class CostsController : ControllerBase
         _hubContext = hubContext;
         _logger = logger;
         _emailService = emailService;
+        _auditLogService = auditLogService;
     }
 
     [HttpGet]
@@ -235,73 +238,140 @@ public class CostsController : ControllerBase
         if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
         var userName = User.Identity?.Name ?? "Unknown";
 
-        input.Id = ObjectId.GenerateNewId().ToString();
-
-        var maxLegacyId = await _costs.Find(_ => true)
-            .SortByDescending(c => c.LegacyId)
-            .Limit(1)
-            .FirstOrDefaultAsync();
-
-        input.LegacyId = maxLegacyId != null ? maxLegacyId.LegacyId + 1 : 1;
-        input.CreatedByUserId = userId;
-        input.PaymentStatus = "Đợi duyệt";
-        
-        input.StatusHistory = new List<CostStatusHistory>
+        try
         {
-            new CostStatusHistory
+            input.Id = ObjectId.GenerateNewId().ToString();
+
+            Cost? maxLegacyId = null;
+            for (var attempt = 0; attempt < 3; attempt++)
             {
-                Status = "Đợi duyệt",
-                ChangedByUserId = userId,
-                ChangedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
-                Note = "Tạo mới và gửi duyệt"
+                try
+                {
+                    maxLegacyId = await _costs.Find(_ => true)
+                        .SortByDescending(c => c.LegacyId)
+                        .Limit(1)
+                        .FirstOrDefaultAsync();
+                    break;
+                }
+                catch
+                {
+                    if (attempt == 2) throw;
+                    await Task.Delay(300);
+                }
             }
-        };
 
-        await _costs.InsertOneAsync(input);
+            input.LegacyId = maxLegacyId != null ? maxLegacyId.LegacyId + 1 : 1;
+            input.CreatedByUserId = userId;
+            input.PaymentStatus = "Đợi duyệt";
 
-        // Notify Selected Recipients
-        HashSet<int> notifiedUserIds = new HashSet<int>();
-
-        if (input.NotificationRecipients != null && input.NotificationRecipients.Count > 0)
-        {
-            foreach (var recipientId in input.NotificationRecipients)
+            input.StatusHistory = new List<CostStatusHistory>
             {
-                 if (notifiedUserIds.Contains(recipientId)) continue;
-                 
-                 await CreateAndSendNotification(recipientId, "Phiếu chi mới cần duyệt", 
-                    $"{userName} đã tạo phiếu chi #{input.LegacyId}. Vui lòng duyệt.", "CostApproval", input.LegacyId.ToString());
-                 notifiedUserIds.Add(recipientId);
+                new CostStatusHistory
+                {
+                    Status = "Đợi duyệt",
+                    ChangedByUserId = userId,
+                    ChangedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                    Note = "Tạo mới và gửi duyệt"
+                }
+            };
+
+            for (var attempt = 0; attempt < 3; attempt++)
+            {
+                try
+                {
+                    await _costs.InsertOneAsync(input);
+                    break;
+                }
+                catch
+                {
+                    if (attempt == 2) throw;
+                    await Task.Delay(300);
+                }
             }
+
+            try
+            {
+                var actor = await _users.Find(u => u.LegacyId == userId).FirstOrDefaultAsync();
+                await _auditLogService.LogAsync("cost", input.LegacyId, "create", actor, null, input);
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                HashSet<int> notifiedUserIds = new HashSet<int>();
+
+                if (input.NotificationRecipients != null && input.NotificationRecipients.Count > 0)
+                {
+                    foreach (var recipientId in input.NotificationRecipients)
+                    {
+                        if (notifiedUserIds.Contains(recipientId)) continue;
+
+                        await CreateAndSendNotification(
+                            recipientId,
+                            "Phiếu chi mới cần duyệt",
+                            $"{userName} đã tạo phiếu chi #{input.LegacyId}. Vui lòng duyệt.",
+                            "CostApproval",
+                            input.LegacyId.ToString()
+                        );
+                        notifiedUserIds.Add(recipientId);
+                    }
+                }
+                else
+                {
+                    var creator = await _users.Find(u => u.LegacyId == userId).FirstOrDefaultAsync();
+                    bool managerNotified = false;
+
+                    if (creator != null && !string.IsNullOrEmpty(creator.ManagerId) && int.TryParse(creator.ManagerId, out int managerId))
+                    {
+                        if (!notifiedUserIds.Contains(managerId))
+                        {
+                            await CreateAndSendNotification(
+                                managerId,
+                                "Phiếu chi mới cần duyệt",
+                                $"{userName} đã tạo phiếu chi #{input.LegacyId}. Vui lòng duyệt.",
+                                "CostApproval",
+                                input.LegacyId.ToString()
+                            );
+                            notifiedUserIds.Add(managerId);
+                        }
+                        managerNotified = true;
+                    }
+
+                    if (!managerNotified)
+                    {
+                        await SendNotificationToRole(
+                            "ip_manager",
+                            "Phiếu chi mới cần duyệt",
+                            $"{userName} đã tạo phiếu chi #{input.LegacyId}. Vui lòng duyệt.",
+                            "CostApproval",
+                            input.LegacyId.ToString(),
+                            notifiedUserIds
+                        );
+                    }
+
+                    await SendNotificationToRole(
+                        "admin",
+                        "Phiếu chi mới cần duyệt",
+                        $"{userName} đã tạo phiếu chi #{input.LegacyId}. Vui lòng duyệt.",
+                        "CostApproval",
+                        input.LegacyId.ToString(),
+                        notifiedUserIds
+                    );
+                }
+            }
+            catch
+            {
+            }
+
+            return Ok(new { message = "Tạo phiếu thành công", id = input.LegacyId });
         }
-        else
+        catch (Exception ex)
         {
-            // Fallback: Notify Specific Manager if available
-            var creator = await _users.Find(u => u.LegacyId == userId).FirstOrDefaultAsync();
-            bool managerNotified = false;
-
-            if (creator != null && !string.IsNullOrEmpty(creator.ManagerId) && int.TryParse(creator.ManagerId, out int managerId))
-            {
-                 if (!notifiedUserIds.Contains(managerId))
-                 {
-                     await CreateAndSendNotification(managerId, "Phiếu chi mới cần duyệt", 
-                        $"{userName} đã tạo phiếu chi #{input.LegacyId}. Vui lòng duyệt.", "CostApproval", input.LegacyId.ToString());
-                     notifiedUserIds.Add(managerId);
-                 }
-                 managerNotified = true;
-            }
-
-            // If no specific manager, notify all managers
-            if (!managerNotified)
-            {
-                await SendNotificationToRole("ip_manager", "Phiếu chi mới cần duyệt", 
-                    $"{userName} đã tạo phiếu chi #{input.LegacyId}. Vui lòng duyệt.", "CostApproval", input.LegacyId.ToString(), notifiedUserIds);
-            }
-            
-            await SendNotificationToRole("admin", "Phiếu chi mới cần duyệt", 
-                $"{userName} đã tạo phiếu chi #{input.LegacyId}. Vui lòng duyệt.", "CostApproval", input.LegacyId.ToString(), notifiedUserIds);
+            _logger.LogError(ex, "Failed to create cost");
+            return StatusCode(500, new { message = "Không thể lưu phiếu chi. Vui lòng thử lại." });
         }
-
-        return Ok(new { message = "Tạo phiếu thành công", id = input.LegacyId });
     }
 
     [HttpPut("{id:int}")]
@@ -314,6 +384,7 @@ public class CostsController : ControllerBase
 
         var cost = await _costs.Find(c => c.LegacyId == id).FirstOrDefaultAsync();
         if (cost == null) return NotFound(new { message = "Cost not found" });
+        var before = JsonSerializer.Deserialize<Cost>(JsonSerializer.Serialize(cost)) ?? cost;
 
         // RBAC: Check if user can edit
         bool canEdit = false;
@@ -382,6 +453,14 @@ public class CostsController : ControllerBase
         // Allow PaymentStatus, RejectionReason, Approver* fields to be updated from input
 
         await _costs.ReplaceOneAsync(c => c.Id == cost.Id, input);
+        try
+        {
+            var actor = await _users.Find(u => u.LegacyId == userId).FirstOrDefaultAsync();
+            await _auditLogService.LogAsync("cost", input.LegacyId, "update", actor, before, input);
+        }
+        catch
+        {
+        }
 
         return Ok(new { message = "Cập nhật thành công", id = input.LegacyId });
     }
@@ -395,6 +474,7 @@ public class CostsController : ControllerBase
 
         var cost = await _costs.Find(c => c.LegacyId == id).FirstOrDefaultAsync();
         if (cost == null) return NotFound(new { message = "Cost not found" });
+        var before = JsonSerializer.Deserialize<Cost>(JsonSerializer.Serialize(cost)) ?? cost;
 
         // RBAC: Check if user can delete
         bool canDelete = false;
@@ -409,6 +489,17 @@ public class CostsController : ControllerBase
         }
 
         var result = await _costs.DeleteOneAsync(c => c.LegacyId == id);
+        if (result.DeletedCount > 0)
+        {
+            try
+            {
+                var actor = await _users.Find(u => u.LegacyId == userId).FirstOrDefaultAsync();
+                await _auditLogService.LogAsync("cost", id, "delete", actor, cost, null);
+            }
+            catch
+            {
+            }
+        }
         return Ok(new { message = "Cost deleted" });
     }
 
@@ -434,6 +525,7 @@ public class CostsController : ControllerBase
 
         var cost = await _costs.Find(c => c.LegacyId == id).FirstOrDefaultAsync();
         if (cost == null) return NotFound(new { message = "Cost not found" });
+        var before = JsonSerializer.Deserialize<Cost>(JsonSerializer.Serialize(cost)) ?? cost;
 
         // Get Requester Info for hierarchy lookup
         var requester = await _users.Find(u => u.LegacyId == cost.CreatedByUserId).FirstOrDefaultAsync();
@@ -538,6 +630,14 @@ public class CostsController : ControllerBase
         });
 
         await _costs.ReplaceOneAsync(c => c.Id == cost.Id, cost);
+        try
+        {
+            var actor = await _users.Find(u => u.LegacyId == userId).FirstOrDefaultAsync();
+            await _auditLogService.LogAsync("cost", cost.LegacyId, "approve", actor, before, cost);
+        }
+        catch
+        {
+        }
 
         // Send Notifications
         // 1. To Specific Users (Hierarchy)
@@ -601,6 +701,7 @@ public class CostsController : ControllerBase
 
         var cost = await _costs.Find(c => c.LegacyId == id).FirstOrDefaultAsync();
         if (cost == null) return NotFound(new { message = "Cost not found" });
+        var before = JsonSerializer.Deserialize<Cost>(JsonSerializer.Serialize(cost)) ?? cost;
 
         cost.PaymentStatus = "Từ chối";
         cost.RejectionReason = reason;
@@ -613,6 +714,14 @@ public class CostsController : ControllerBase
         });
 
         await _costs.ReplaceOneAsync(c => c.Id == cost.Id, cost);
+        try
+        {
+            var actor = await _users.Find(u => u.LegacyId == userId).FirstOrDefaultAsync();
+            await _auditLogService.LogAsync("cost", cost.LegacyId, "reject", actor, before, cost);
+        }
+        catch
+        {
+        }
 
         // Notify Requester
         await CreateAndSendNotification(cost.CreatedByUserId, "Phiếu chi bị từ chối", 

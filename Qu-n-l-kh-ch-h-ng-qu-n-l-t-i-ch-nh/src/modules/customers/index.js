@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Table,
   Input,
+  InputNumber,
   Button,
   Space,
   Modal,
@@ -73,6 +74,11 @@ const Customers = () => {
   };
 
   const [fieldPermissions, setFieldPermissions] = useState({});
+  const [nsnnSources, setNsnnSources] = useState([]);
+  const [nsnnSourcesLoading, setNsnnSourcesLoading] = useState(false);
+  const [nsnnNewSourceName, setNsnnNewSourceName] = useState('');
+  const [isNsnnManageVisible, setIsNsnnManageVisible] = useState(false);
+  const [nsnnManageDrafts, setNsnnManageDrafts] = useState({});
 
   const { Option } = Select;
   const { TextArea } = Input;
@@ -87,6 +93,52 @@ const Customers = () => {
     if (isAdmin && isAdmin()) return true;
     const level = fieldPermissions[field];
     return level === 'W' || level === 'A';
+  };
+
+  const canManageNsnnSources = isAdmin && isAdmin();
+
+  const addNsnnSource = async () => {
+    const nextName = nsnnNewSourceName.trim();
+    if (!nextName) return;
+    try {
+      await axios.post('/api/nsnn-sources', { name: nextName });
+      setNsnnNewSourceName('');
+      await fetchNsnnSources();
+      message.success('Đã thêm nguồn NSNN');
+    } catch (error) {
+      handleApiError(error, 'Không thể thêm nguồn NSNN');
+    }
+  };
+
+  const openNsnnManage = () => {
+    const drafts = {};
+    (nsnnSources || []).forEach((x) => {
+      drafts[x.id] = x.name;
+    });
+    setNsnnManageDrafts(drafts);
+    setIsNsnnManageVisible(true);
+  };
+
+  const saveNsnnSource = async (id) => {
+    const nextName = (nsnnManageDrafts[id] || '').trim();
+    if (!nextName) return;
+    try {
+      await axios.put(`/api/nsnn-sources/${id}`, { name: nextName });
+      await fetchNsnnSources();
+      message.success('Đã cập nhật nguồn NSNN');
+    } catch (error) {
+      handleApiError(error, 'Không thể cập nhật nguồn NSNN');
+    }
+  };
+
+  const deleteNsnnSource = async (id) => {
+    try {
+      await axios.delete(`/api/nsnn-sources/${id}`);
+      await fetchNsnnSources();
+      message.success('Đã xóa nguồn NSNN');
+    } catch (error) {
+      handleApiError(error, 'Không thể xóa nguồn NSNN');
+    }
   };
 
   const getColumnSearchProps = (dataIndex) => ({
@@ -184,10 +236,23 @@ const Customers = () => {
     }
   }, []);
 
+  const fetchNsnnSources = useCallback(async () => {
+    setNsnnSourcesLoading(true);
+    try {
+      const res = await axios.get('/api/nsnn-sources');
+      setNsnnSources(res.data.items || []);
+    } catch (error) {
+      setNsnnSources([]);
+    } finally {
+      setNsnnSourcesLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchPermissions();
     fetchCustomers();
-  }, [fetchCustomers, fetchPermissions]);
+    fetchNsnnSources();
+  }, [fetchCustomers, fetchPermissions, fetchNsnnSources]);
 
   const handleTableChange = (pagination, filters, sorter) => {
     setTableParams({
@@ -286,7 +351,7 @@ const Customers = () => {
   };
 
   const formatCurrency = (value) => {
-    if (!value) return '';
+    if (value === null || value === undefined || value === '') return '';
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
   };
 
@@ -654,6 +719,7 @@ const Customers = () => {
       width: 140,
       sorter: true,
       ...getColumnSearchProps('stateFee'),
+      render: (val) => formatCurrency(val),
       hidden: !canReadField('stateFee'),
     },
     {
@@ -663,6 +729,7 @@ const Customers = () => {
       width: 130,
       sorter: true,
       ...getColumnSearchProps('additionalFee'),
+      render: (val) => formatCurrency(val),
       hidden: !canReadField('additionalFee'),
     },
     {
@@ -951,12 +1018,40 @@ const Customers = () => {
               name="nsnnSource"
               label="Nguồn NSNN"
             >
-              <Select allowClear disabled={!canEditField('nsnnSource')}>
-                <Option value="TACs">TACs</Option>
-                <Option value="Sở TC Huế">Sở TC Huế</Option>
-                <Option value="Sở CT Quảng Trị">Sở CT Quảng Trị</Option>
-                <Option value="Sở CT Hậu Giang">Sở CT Hậu Giang</Option>
-                <Option value="Chi cục PTNT Lâm Đồng">Chi cục PTNT Lâm Đồng</Option>
+              <Select
+                allowClear
+                disabled={!canEditField('nsnnSource')}
+                loading={nsnnSourcesLoading}
+                dropdownRender={(menu) => (
+                  <div>
+                    {menu}
+                    {canManageNsnnSources && (
+                      <div style={{ padding: 8 }}>
+                        <Space style={{ width: '100%' }}>
+                          <Input
+                            size="small"
+                            placeholder="Thêm nguồn NSNN..."
+                            value={nsnnNewSourceName}
+                            onChange={(e) => setNsnnNewSourceName(e.target.value)}
+                            onPressEnter={addNsnnSource}
+                          />
+                          <Button size="small" type="primary" onClick={addNsnnSource}>
+                            Thêm
+                          </Button>
+                          <Button size="small" onClick={openNsnnManage}>
+                            Sửa/Xóa
+                          </Button>
+                        </Space>
+                      </div>
+                    )}
+                  </div>
+                )}
+              >
+                {(nsnnSources || []).map((x) => (
+                  <Option key={x.id} value={x.name}>
+                    {x.name}
+                  </Option>
+                ))}
               </Select>
             </Form.Item>
           </Col>
@@ -1204,17 +1299,33 @@ const Customers = () => {
           <Col span={8}>
             <Form.Item
               name="stateFee"
-              label="Lệ phí nhà nước"
+              label="Lệ phí nhà nước (VND)"
             >
-              <Input type="number" disabled={!canEditField('stateFee')} />
+              <InputNumber
+                style={{ width: '100%' }}
+                disabled={!canEditField('stateFee')}
+                formatter={(value) => {
+                  if (value === null || value === undefined || value === '') return '';
+                  return new Intl.NumberFormat('vi-VN').format(Number(value));
+                }}
+                parser={(value) => (value ? value.replace(/\./g, '').replace(/[^\d]/g, '') : '')}
+              />
             </Form.Item>
           </Col>
           <Col span={8}>
             <Form.Item
               name="additionalFee"
-              label="Phí phát sinh"
+              label="Phí phát sinh (VND)"
             >
-              <Input type="number" disabled={!canEditField('additionalFee')} />
+              <InputNumber
+                style={{ width: '100%' }}
+                disabled={!canEditField('additionalFee')}
+                formatter={(value) => {
+                  if (value === null || value === undefined || value === '') return '';
+                  return new Intl.NumberFormat('vi-VN').format(Number(value));
+                }}
+                parser={(value) => (value ? value.replace(/\./g, '').replace(/[^\d]/g, '') : '')}
+              />
             </Form.Item>
           </Col>
           <Col span={8}>
@@ -1395,6 +1506,39 @@ const Customers = () => {
             </Space>
           </div>
         </Form>
+      </Modal>
+
+      <Modal
+        title="Quản lý Nguồn NSNN"
+        open={isNsnnManageVisible}
+        onCancel={() => setIsNsnnManageVisible(false)}
+        footer={null}
+        width={520}
+      >
+        {(nsnnSources || []).map((x) => (
+          <div key={x.id} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+            <Input
+              value={nsnnManageDrafts[x.id] ?? x.name}
+              onChange={(e) =>
+                setNsnnManageDrafts((prev) => ({
+                  ...prev,
+                  [x.id]: e.target.value,
+                }))
+              }
+            />
+            <Button type="primary" onClick={() => saveNsnnSource(x.id)}>
+              Lưu
+            </Button>
+            <Popconfirm
+              title="Xóa nguồn này?"
+              onConfirm={() => deleteNsnnSource(x.id)}
+              okText="Có"
+              cancelText="Không"
+            >
+              <Button danger>Xóa</Button>
+            </Popconfirm>
+          </div>
+        ))}
       </Modal>
     </div>
   );

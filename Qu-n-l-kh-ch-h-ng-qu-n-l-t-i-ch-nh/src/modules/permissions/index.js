@@ -9,13 +9,14 @@ const { Title, Text } = Typography;
 const PermissionModule = () => {
   const [loading, setLoading] = useState(false);
   const [roles, setRoles] = useState([]);
-  const [permissions, setPermissions] = useState({ qlkh: {}, qlcp: {}, users: {}, dashboard: {}, export: {}, scheduling: {} });
+  const [permissions, setPermissions] = useState({ qlkh: {}, qlcp: {}, users: {}, dashboard: {}, export: {}, scheduling: {}, audit: {} });
   const [qlkhFields, setQlkhFields] = useState([]);
   const [qlcpFields, setQlcpFields] = useState([]);
   const [schedulingFields, setSchedulingFields] = useState([]);
   const [userFields, setUserFields] = useState([]);
   const [dashboardFields, setDashboardFields] = useState([]);
   const [exportFields, setExportFields] = useState([]);
+  const [auditFields, setAuditFields] = useState([]);
 
   useEffect(() => {
     fetchPermissions();
@@ -34,6 +35,7 @@ const PermissionModule = () => {
         dashboard: data.permissions?.dashboard || {},
         export: data.permissions?.export || {},
         scheduling: data.permissions?.scheduling || {},
+        audit: data.permissions?.audit || {},
       });
       setQlkhFields(data.qlkhFields || []);
       setQlcpFields(data.qlcpFields || []);
@@ -41,6 +43,7 @@ const PermissionModule = () => {
       setUserFields(data.userFields || []);
       setDashboardFields(data.dashboardFields || []);
       setExportFields(data.exportFields || []);
+      setAuditFields(data.auditFields || []);
     } catch (error) {
       console.error('Failed to fetch permissions:', error);
       message.error('Không thể tải dữ liệu phân quyền');
@@ -173,6 +176,10 @@ const PermissionModule = () => {
             items = items.filter(item => ['A', 'N'].includes(item.key));
           }
 
+          if (moduleName === 'audit') {
+            items = items.filter(item => ['R', 'N'].includes(item.key));
+          }
+
           return (
             <Dropdown
               trigger={['click']}
@@ -266,6 +273,11 @@ const PermissionModule = () => {
             key: 'scheduling',
             label: 'Chấm công dự án',
             children: renderTable('scheduling', schedulingFields),
+          },
+          {
+            key: 'audit',
+            label: 'Lịch sử tác động',
+            children: renderTable('audit', auditFields),
           },
         ]}
       />

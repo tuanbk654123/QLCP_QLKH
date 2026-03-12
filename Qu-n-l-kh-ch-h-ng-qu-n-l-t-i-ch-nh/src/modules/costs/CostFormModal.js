@@ -8,6 +8,7 @@ import {
   Form,
   message,
   notification,
+  Popconfirm,
   Select,
   DatePicker,
   Tabs,
@@ -42,6 +43,11 @@ const CostFormModal = ({
   const [rejectReasonModalVisible, setRejectReasonModalVisible] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [activeTab, setActiveTab] = useState('1');
+  const [projectCodes, setProjectCodes] = useState([]);
+  const [projectCodesLoading, setProjectCodesLoading] = useState(false);
+  const [projectCodeNewValue, setProjectCodeNewValue] = useState('');
+  const [isProjectCodeManageVisible, setIsProjectCodeManageVisible] = useState(false);
+  const [projectCodeManageDrafts, setProjectCodeManageDrafts] = useState({});
 
   const onFinishFailed = ({ errorFields }) => {
     if (errorFields.length > 0) {
@@ -69,6 +75,12 @@ const CostFormModal = ({
   useEffect(() => {
     if (visible) {
       setActiveTab('1');
+      setProjectCodesLoading(true);
+      axios
+        .get('/api/project-codes')
+        .then((res) => setProjectCodes(res.data.items || []))
+        .catch(() => setProjectCodes([]))
+        .finally(() => setProjectCodesLoading(false));
       if (editingCost) {
         const formattedRecord = {
           ...editingCost,
@@ -131,6 +143,64 @@ const CostFormModal = ({
     return level === 'W' || level === 'A';
   };
 
+  const canManageProjectCodes = user?.role === 'admin';
+
+  const fetchProjectCodes = async () => {
+    setProjectCodesLoading(true);
+    try {
+      const res = await axios.get('/api/project-codes');
+      setProjectCodes(res.data.items || []);
+    } catch (error) {
+      setProjectCodes([]);
+    } finally {
+      setProjectCodesLoading(false);
+    }
+  };
+
+  const addProjectCode = async () => {
+    const nextValue = projectCodeNewValue.trim();
+    if (!nextValue) return;
+    try {
+      await axios.post('/api/project-codes', { code: nextValue });
+      setProjectCodeNewValue('');
+      await fetchProjectCodes();
+      message.success('Đã thêm mã dự án');
+    } catch (error) {
+      handleApiError(error, 'Không thể thêm mã dự án');
+    }
+  };
+
+  const openProjectCodeManage = () => {
+    const drafts = {};
+    (projectCodes || []).forEach((x) => {
+      drafts[x.id] = x.code;
+    });
+    setProjectCodeManageDrafts(drafts);
+    setIsProjectCodeManageVisible(true);
+  };
+
+  const saveProjectCode = async (id) => {
+    const nextValue = (projectCodeManageDrafts[id] || '').trim();
+    if (!nextValue) return;
+    try {
+      await axios.put(`/api/project-codes/${id}`, { code: nextValue });
+      await fetchProjectCodes();
+      message.success('Đã cập nhật mã dự án');
+    } catch (error) {
+      handleApiError(error, 'Không thể cập nhật mã dự án');
+    }
+  };
+
+  const deleteProjectCode = async (id) => {
+    try {
+      await axios.delete(`/api/project-codes/${id}`);
+      await fetchProjectCodes();
+      message.success('Đã xóa mã dự án');
+    } catch (error) {
+      handleApiError(error, 'Không thể xóa mã dự án');
+    }
+  };
+
   const calculateTotal = (changedValues, allValues) => {
     if (changedValues.amountBeforeTax || changedValues.taxRate) {
       const amount = parseFloat(allValues.amountBeforeTax) || 0;
@@ -144,6 +214,17 @@ const CostFormModal = ({
       form.setFieldsValue({ vatAmount: vat });
       form.setFieldsValue({ totalAmount: total });
     }
+  };
+
+  const formatDateValue = (value) => {
+    if (!value) return null;
+    if (typeof value?.format === 'function') return value.format('YYYY-MM-DD');
+    if (typeof value === 'string') {
+      const parsed = dayjs(value);
+      return parsed.isValid() ? parsed.format('YYYY-MM-DD') : null;
+    }
+    const parsed = dayjs(value);
+    return parsed.isValid() ? parsed.format('YYYY-MM-DD') : null;
   };
 
   const handleUpload = async (options) => {
@@ -183,11 +264,11 @@ const CostFormModal = ({
                 // Format lại date
                 const formattedValues = {
                     ...values,
-                    requestDate: values.requestDate ? values.requestDate.format('YYYY-MM-DD') : null,
-                    transactionDate: values.transactionDate ? values.transactionDate.format('YYYY-MM-DD') : null,
-                    voucherDate: values.voucherDate ? values.voucherDate.format('YYYY-MM-DD') : null,
-                    payDate: values.payDate ? values.payDate.format('YYYY-MM-DD') : null,
-                    dueDate: values.dueDate ? values.dueDate.format('YYYY-MM-DD') : null,
+                    requestDate: formatDateValue(values.requestDate),
+                    transactionDate: formatDateValue(values.transactionDate),
+                    voucherDate: formatDateValue(values.voucherDate),
+                    payDate: formatDateValue(values.payDate),
+                    dueDate: formatDateValue(values.dueDate),
                 };
                 
                 // Giữ nguyên status hiện tại khi update data (việc đổi status sẽ do API approve làm)
@@ -261,11 +342,11 @@ const CostFormModal = ({
     try {
       const formattedValues = {
         ...values,
-        requestDate: values.requestDate ? values.requestDate.format('YYYY-MM-DD') : null,
-        transactionDate: values.transactionDate ? values.transactionDate.format('YYYY-MM-DD') : null,
-        voucherDate: values.voucherDate ? values.voucherDate.format('YYYY-MM-DD') : null,
-        payDate: values.payDate ? values.payDate.format('YYYY-MM-DD') : null,
-        dueDate: values.dueDate ? values.dueDate.format('YYYY-MM-DD') : null,
+        requestDate: formatDateValue(values.requestDate),
+        transactionDate: formatDateValue(values.transactionDate),
+        voucherDate: formatDateValue(values.voucherDate),
+        payDate: formatDateValue(values.payDate),
+        dueDate: formatDateValue(values.dueDate),
       };
 
       if (editingCost) {
@@ -480,13 +561,40 @@ const CostFormModal = ({
               name="projectCode"
               label="Mã dự án"
             >
-              <Select allowClear disabled={!canEditField('projectCode')}>
-                <Option value="TACs25ND80">TACs25ND80</Option>
-                <Option value="STCHue25ND80">STCHue25ND80</Option>
-                <Option value="SCTQTri25ND80">SCTQTri25ND80</Option>
-                <Option value="SCTCT25ND80">SCTCT25ND80</Option>
-                <Option value="SNNLD25MTQG">SNNLD25MTQG</Option>
-                <Option value="Dịch vụ SHTT">Dịch vụ SHTT</Option>
+              <Select
+                allowClear
+                disabled={!canEditField('projectCode')}
+                loading={projectCodesLoading}
+                dropdownRender={(menu) => (
+                  <div>
+                    {menu}
+                    {canManageProjectCodes && (
+                      <div style={{ padding: 8 }}>
+                        <Space style={{ width: '100%' }}>
+                          <Input
+                            size="small"
+                            placeholder="Thêm mã dự án..."
+                            value={projectCodeNewValue}
+                            onChange={(e) => setProjectCodeNewValue(e.target.value)}
+                            onPressEnter={addProjectCode}
+                          />
+                          <Button size="small" type="primary" onClick={addProjectCode}>
+                            Thêm
+                          </Button>
+                          <Button size="small" onClick={openProjectCodeManage}>
+                            Sửa/Xóa
+                          </Button>
+                        </Space>
+                      </div>
+                    )}
+                  </div>
+                )}
+              >
+                {(projectCodes || []).map((x) => (
+                  <Option key={x.id} value={x.code}>
+                    {x.code}
+                  </Option>
+                ))}
               </Select>
             </Form.Item>
           </Col>
@@ -1086,6 +1194,39 @@ const CostFormModal = ({
             </Tabs.TabPane>
           </Tabs>
         </Form>
+      </Modal>
+
+      <Modal
+        title="Quản lý Mã dự án"
+        open={isProjectCodeManageVisible}
+        onCancel={() => setIsProjectCodeManageVisible(false)}
+        footer={null}
+        width={520}
+      >
+        {(projectCodes || []).map((x) => (
+          <div key={x.id} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+            <Input
+              value={projectCodeManageDrafts[x.id] ?? x.code}
+              onChange={(e) =>
+                setProjectCodeManageDrafts((prev) => ({
+                  ...prev,
+                  [x.id]: e.target.value,
+                }))
+              }
+            />
+            <Button type="primary" onClick={() => saveProjectCode(x.id)}>
+              Lưu
+            </Button>
+            <Popconfirm
+              title="Xóa mã này?"
+              onConfirm={() => deleteProjectCode(x.id)}
+              okText="Có"
+              cancelText="Không"
+            >
+              <Button danger>Xóa</Button>
+            </Popconfirm>
+          </div>
+        ))}
       </Modal>
 
       <Modal

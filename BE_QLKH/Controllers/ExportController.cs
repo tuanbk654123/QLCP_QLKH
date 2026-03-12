@@ -1,3 +1,4 @@
+using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
 using Microsoft.AspNetCore.Authorization;
@@ -113,25 +114,95 @@ public class ExportController : ControllerBase
         
         using (var doc = WordprocessingDocument.Open(memoryStream, true))
         {
-            if (doc.MainDocumentPart?.Document?.Body != null)
-            {
-                var body = doc.MainDocumentPart.Document.Body;
-                var textElements = body.Descendants<Text>().ToList();
-                var sortedReplacements = replacements.OrderByDescending(k => k.Key.Length).ToList();
-
-                foreach (var text in textElements)
-                {
-                    foreach (var kvp in sortedReplacements)
-                    {
-                        if (text.Text.Contains(kvp.Key))
-                        {
-                            text.Text = text.Text.Replace(kvp.Key, kvp.Value);
-                        }
-                    }
-                }
-                doc.Save();
-            }
+            ApplyReplacements(doc, replacements);
+            doc.Save();
         }
         return memoryStream.ToArray();
+    }
+
+    private static void ApplyReplacements(WordprocessingDocument doc, Dictionary<string, string> replacements)
+    {
+        if (doc.MainDocumentPart == null) return;
+
+        var sortedReplacements = replacements
+            .Where(k => !string.IsNullOrWhiteSpace(k.Key))
+            .OrderByDescending(k => k.Key.Length)
+            .Select(k => new KeyValuePair<string, string>(k.Key, k.Value ?? string.Empty))
+            .ToList();
+
+        if (sortedReplacements.Count == 0) return;
+
+        if (doc.MainDocumentPart.Document != null)
+        {
+            ReplaceInRoot(doc.MainDocumentPart.Document, sortedReplacements);
+        }
+
+        foreach (var headerPart in doc.MainDocumentPart.HeaderParts)
+        {
+            if (headerPart.Header != null)
+            {
+                ReplaceInRoot(headerPart.Header, sortedReplacements);
+            }
+        }
+
+        foreach (var footerPart in doc.MainDocumentPart.FooterParts)
+        {
+            if (footerPart.Footer != null)
+            {
+                ReplaceInRoot(footerPart.Footer, sortedReplacements);
+            }
+        }
+
+        if (doc.MainDocumentPart.FootnotesPart?.Footnotes != null)
+        {
+            ReplaceInRoot(doc.MainDocumentPart.FootnotesPart.Footnotes, sortedReplacements);
+        }
+
+        if (doc.MainDocumentPart.EndnotesPart?.Endnotes != null)
+        {
+            ReplaceInRoot(doc.MainDocumentPart.EndnotesPart.Endnotes, sortedReplacements);
+        }
+    }
+
+    private static void ReplaceInRoot(OpenXmlPartRootElement root, List<KeyValuePair<string, string>> sortedReplacements)
+    {
+        foreach (var paragraph in root.Descendants<Paragraph>())
+        {
+            var texts = paragraph.Descendants<Text>().ToList();
+            if (texts.Count == 0) continue;
+
+            var original = string.Concat(texts.Select(t => t.Text));
+            if (string.IsNullOrEmpty(original)) continue;
+
+            var expected = original;
+            foreach (var kvp in sortedReplacements)
+            {
+                if (expected.Contains(kvp.Key))
+                {
+                    expected = expected.Replace(kvp.Key, kvp.Value);
+                }
+            }
+
+            if (string.Equals(expected, original, StringComparison.Ordinal)) continue;
+
+            foreach (var text in texts)
+            {
+                foreach (var kvp in sortedReplacements)
+                {
+                    if (!text.Text.Contains(kvp.Key)) continue;
+                    text.Text = text.Text.Replace(kvp.Key, kvp.Value);
+                }
+            }
+
+            var after = string.Concat(texts.Select(t => t.Text));
+            if (string.Equals(after, expected, StringComparison.Ordinal)) continue;
+
+            texts[0].Text = expected;
+            texts[0].Space = SpaceProcessingModeValues.Preserve;
+            for (var i = 1; i < texts.Count; i++)
+            {
+                texts[i].Text = string.Empty;
+            }
+        }
     }
 }

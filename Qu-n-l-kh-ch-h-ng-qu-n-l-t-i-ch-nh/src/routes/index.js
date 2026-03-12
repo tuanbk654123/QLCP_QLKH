@@ -12,6 +12,7 @@ import PermissionModule from '../modules/permissions';
 import Contracts from '../modules/contracts';
 import ExportWord from '../modules/export-word';
 import SchedulingPage from '../modules/scheduling';
+import AuditLogsPage from '../modules/audit-logs';
 
 const AppRoutes = () => {
   return (
@@ -40,6 +41,14 @@ const AppRoutes = () => {
                 <Route path="/contracts" element={<Contracts />} />
                 <Route path="/export-word" element={<ExportWord />} />
                 <Route path="/scheduling" element={<SchedulingPage />} />
+                <Route
+                  path="/audit-logs"
+                  element={
+                    <ProtectedRoute requireAuditLogs={true}>
+                      <AuditLogsPage />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>
             </AppLayout>

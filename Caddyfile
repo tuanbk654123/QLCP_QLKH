@@ -1,7 +1,3 @@
-{
-	email {$ACME_EMAIL}
-}
-
 crm.anneco.vn {
 	encode zstd gzip
 

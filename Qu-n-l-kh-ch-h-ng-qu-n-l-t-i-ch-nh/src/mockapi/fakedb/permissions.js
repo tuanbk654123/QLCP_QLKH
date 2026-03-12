@@ -119,6 +119,7 @@ export const qlkhFields = [
       { key: 'updatedBy', label: 'Người cập nhật' },
       { key: 'updatedAt', label: 'Ngày cập nhật' },
       { key: 'documentLink', label: 'Link hồ sơ giấy tờ' },
+      { key: 'auditLog', label: 'Lịch sử tác động' },
     ],
   },
 ];
@@ -186,6 +187,7 @@ export const qlcpFields = [
       { key: 'adjustReason', label: 'Lý do điều chỉnh' },
       { key: 'rejectionReason', label: 'Lý do từ chối' },
       { key: 'riskFlag', label: 'Cờ kiểm soát rủi ro' },
+      { key: 'auditLog', label: 'Lịch sử tác động' },
     ],
   },
 ];
@@ -540,8 +542,16 @@ const init = () => {
       director: 'W',
       ceo: 'W',
     }),
+    auditLog: getRoleMap({
+      marketing_sales: 'R',
+      ip_executive: 'R',
+      ip_manager: 'R',
+      accountant: 'N',
+      director: 'R',
+      ceo: 'A',
+      admin: 'A',
+    }),
   };
-
   const qlcpFieldPermissions = {
     requester: getRoleMap({
       marketing_sales: 'W',
@@ -794,6 +804,15 @@ const init = () => {
       accountant: 'R',
       director: 'W',
       ceo: 'W',
+    }),
+    auditLog: getRoleMap({
+      marketing_sales: 'R',
+      ip_executive: 'R',
+      ip_manager: 'R',
+      accountant: 'R',
+      director: 'R',
+      ceo: 'A',
+      admin: 'A',
     }),
   };
 

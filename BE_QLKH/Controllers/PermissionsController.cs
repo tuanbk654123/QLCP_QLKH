@@ -32,7 +32,8 @@ public class PermissionsController : ControllerBase
                 users = matrix.UserPermissions,
                 dashboard = matrix.DashboardPermissions,
                 export = matrix.ExportPermissions,
-                scheduling = matrix.SchedulingPermissions
+                scheduling = matrix.SchedulingPermissions,
+                audit = matrix.AuditPermissions
             },
             qlkhFields = matrix.QlkhFields.Select(g => new
             {
@@ -65,6 +66,12 @@ public class PermissionsController : ControllerBase
                 children = g.Children.Select(c => new { key = c.Key, label = c.Label })
             }),
             schedulingFields = matrix.SchedulingFields.Select(g => new
+            {
+                key = g.Key,
+                label = g.Label,
+                children = g.Children.Select(c => new { key = c.Key, label = c.Label })
+            }),
+            auditFields = matrix.AuditFields.Select(g => new
             {
                 key = g.Key,
                 label = g.Label,
