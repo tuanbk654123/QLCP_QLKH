@@ -2,6 +2,8 @@ using System.Text;
 using BE_QLKH.Hubs;
 using BE_QLKH.Models;
 using BE_QLKH.Services;
+using Amazon.Runtime;
+using Amazon.S3;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -18,6 +20,9 @@ builder.Services.Configure<AuthSettings>(
 builder.Services.Configure<EmailSettings>(
     builder.Configuration.GetSection("EmailSettings"));
 
+builder.Services.Configure<StorageSettings>(
+    builder.Configuration.GetSection("Storage"));
+
 builder.Services.AddSingleton<IMongoClient>(sp =>
 {
     var options = sp.GetRequiredService<IOptions<MongoDbSettings>>();
@@ -28,6 +33,33 @@ builder.Services.AddScoped<IPermissionService, PermissionService>();
 builder.Services.AddTransient<IEmailService, EmailService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddHostedService<DatabaseSeeder>();
+
+builder.Services.AddSingleton<IAmazonS3>(sp =>
+{
+    var storage = sp.GetRequiredService<IOptions<StorageSettings>>().Value;
+    var s3 = storage.S3;
+
+    var config = new AmazonS3Config
+    {
+        ServiceURL = s3.ServiceUrl,
+        ForcePathStyle = s3.ForcePathStyle
+    };
+
+    var credentials = new BasicAWSCredentials(s3.AccessKey, s3.SecretKey);
+    return new AmazonS3Client(credentials, config);
+});
+
+builder.Services.AddSingleton<IFileStorage>(sp =>
+{
+    var storage = sp.GetRequiredService<IOptions<StorageSettings>>().Value;
+    if (string.Equals(storage.Provider, "S3", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(storage.Provider, "MinIO", StringComparison.OrdinalIgnoreCase))
+    {
+        return ActivatorUtilities.CreateInstance<S3FileStorage>(sp);
+    }
+
+    return ActivatorUtilities.CreateInstance<LocalFileStorage>(sp);
+});
 
 builder.Services.AddControllers();
 builder.Services.AddSignalR();

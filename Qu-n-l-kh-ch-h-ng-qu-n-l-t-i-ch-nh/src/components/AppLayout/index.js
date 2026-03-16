@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Layout, Menu, Dropdown, Avatar, Space, Badge, Popover, List, Typography, Button, Empty, Drawer, Grid } from 'antd';
+import { Layout, Menu, Dropdown, Avatar, Space, Badge, Popover, List, Typography, Button, Empty, Drawer, Grid, Select } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   DashboardOutlined,
@@ -39,7 +39,7 @@ const AppLayout = ({ children }) => {
   }, [location.pathname]);
 
   const isMobile = !screens.lg;
-  const { user, logout, canAccessUsersModule, canAccessPermissions, canAccessAuditLogs, getPermissionLevel, isAdmin } = useAuth();
+  const { user, logout, canAccessUsersModule, canAccessPermissions, canAccessAuditLogs, getPermissionLevel, isAdmin, companies, activeCompanyId, switchCompany } = useAuth();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotification();
   const [visible, setVisible] = useState(false);
 
@@ -122,12 +122,12 @@ const AppLayout = ({ children }) => {
       {
         key: '/customers',
         icon: <UserOutlined />,
-        label: 'Quản lý khách hàng',
+        label: 'Quản lý KH SHTT',
       },
       {
         key: '/costs',
         icon: <DollarOutlined />,
-        label: 'Quản lý chi phí',
+        label: 'Quản lý tài chính - kế toán',
       },
       {
         key: '/scheduling',
@@ -135,14 +135,6 @@ const AppLayout = ({ children }) => {
         label: 'Chấm công dự án',
       },
     ];
-
-    if (canAccessAuditLogs()) {
-      items.push({
-        key: '/audit-logs',
-        icon: <HistoryOutlined />,
-        label: 'Lịch sử tác động',
-      });
-    }
 
     const exportDocPerm = getPermissionLevel('export', 'export_doc');
     if (exportDocPerm && exportDocPerm !== 'N') {
@@ -167,6 +159,20 @@ const AppLayout = ({ children }) => {
         key: '/permissions',
         icon: <SafetyCertificateOutlined />,
         label: 'Phân quyền',
+      });
+
+      items.push({
+        key: '/companies',
+        icon: <ShopOutlined />,
+        label: 'Quản lý công ty',
+      });
+    }
+
+    if (canAccessAuditLogs()) {
+      items.push({
+        key: '/audit-logs',
+        icon: <HistoryOutlined />,
+        label: 'Lịch sử tác động',
       });
     }
 
@@ -253,6 +259,14 @@ const AppLayout = ({ children }) => {
             </h1>
           </div>
           <Space size={isMobile ? "small" : "large"}>
+            {!isMobile && companies && companies.length > 1 && (
+              <Select
+                value={activeCompanyId || undefined}
+                style={{ width: 220 }}
+                onChange={(v) => switchCompany(v)}
+                options={(companies || []).map((c) => ({ value: c.id, label: `${c.code} - ${c.name}` }))}
+              />
+            )}
             <Popover
               content={notificationContent}
               trigger="click"

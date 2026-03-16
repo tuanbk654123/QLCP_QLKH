@@ -33,7 +33,10 @@ const ROLE_OPTIONS = [
   { value: 'ip_executive', label: 'Chuyên viên SHTT' },
   { value: 'ip_manager', label: 'Trưởng phòng SHTT' },
   { value: 'director', label: 'Giám đốc' },
+  { value: 'assistant_director', label: 'Trợ lý GĐ' },
   { value: 'ceo', label: 'Tổng giám đốc' },
+  { value: 'assistant_ceo', label: 'Trợ lý TGĐ' },
+  { value: 'hr', label: 'Nhân sự' },
   { value: 'accountant', label: 'Kế toán' },
   { value: 'admin', label: 'Admin' },
 ];
@@ -49,7 +52,10 @@ const ROLE_COLORS = {
   ip_executive: 'geekblue',
   ip_manager: 'blue',
   director: 'red',
+  assistant_director: 'red',
   ceo: 'volcano',
+  assistant_ceo: 'volcano',
+  hr: 'cyan',
   accountant: 'green',
 };
 
@@ -58,6 +64,8 @@ const Users = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [companyOptions, setCompanyOptions] = useState([]);
+  const [companyOptionsLoading, setCompanyOptionsLoading] = useState(false);
   
   const [tableParams, setTableParams] = useState({
     pagination: {
@@ -71,6 +79,25 @@ const Users = () => {
   const [editingUser, setEditingUser] = useState(null);
   const [form] = Form.useForm();
   const [fieldPermissions, setFieldPermissions] = useState({});
+
+  const fetchCompanyOptions = useCallback(async () => {
+    setCompanyOptionsLoading(true);
+    try {
+      try {
+        const res = await axios.get('/api/companies');
+        const items = res.data.items || [];
+        setCompanyOptions(items.map((c) => ({ value: c.id, label: `${c.code} - ${c.name}` })));
+      } catch (err) {
+        const res = await axios.get('/api/auth/companies');
+        const items = res.data.items || [];
+        setCompanyOptions(items.map((c) => ({ value: c.id, label: `${c.code} - ${c.name}` })));
+      }
+    } catch (error) {
+      setCompanyOptions([]);
+    } finally {
+      setCompanyOptionsLoading(false);
+    }
+  }, []);
 
   const fetchPermissions = useCallback(async () => {
     try {
@@ -185,12 +212,24 @@ const Users = () => {
       role: 'marketing_sales',
       status: 'active',
     });
+    fetchCompanyOptions();
     setIsModalVisible(true);
   };
 
   const handleEdit = (record) => {
     setEditingUser(record);
     form.setFieldsValue(record);
+    fetchCompanyOptions();
+    axios
+      .get(`/api/users/${record.id}/companies`)
+      .then((res) => {
+        const ids = (res.data.items || []).map((x) => x.id);
+        form.setFieldsValue({
+          companyIds: ids,
+          defaultCompanyId: res.data.defaultCompanyId || (ids[0] || undefined),
+        });
+      })
+      .catch(() => {});
     setIsModalVisible(true);
   };
 
@@ -206,14 +245,28 @@ const Users = () => {
 
   const handleSubmit = async (values) => {
     try {
+      const { companyIds, defaultCompanyId, ...userValues } = values;
       if (editingUser) {
-        await axios.put(`/api/users/${editingUser.id}`, values);
+        await axios.put(`/api/users/${editingUser.id}`, userValues);
+        if (companyIds && companyIds.length > 0) {
+          await axios.put(`/api/users/${editingUser.id}/companies`, {
+            companyIds,
+            defaultCompanyId,
+          });
+        }
         message.success('Cập nhật nhân viên thành công');
       } else {
-        await axios.post('/api/users', {
-          ...values,
+        const created = await axios.post('/api/users', {
+          ...userValues,
           password: values.password || '123456', // Default password
         });
+        const newId = created.data?.id;
+        if (newId && companyIds && companyIds.length > 0) {
+          await axios.put(`/api/users/${newId}/companies`, {
+            companyIds,
+            defaultCompanyId,
+          });
+        }
         message.success('Thêm nhân viên thành công');
       }
       setIsModalVisible(false);
@@ -782,18 +835,39 @@ const Users = () => {
           <Row gutter={16}>
              <Col span={12}>
               <Form.Item
-                name="company"
+                name="companyIds"
                 label="Công ty"
+                rules={[{ required: true, message: 'Vui lòng chọn công ty' }]}
               >
-                <Input />
+                <Select
+                  mode="multiple"
+                  allowClear
+                  loading={companyOptionsLoading}
+                  options={companyOptions}
+                  onChange={(ids) => {
+                    const currentDefault = form.getFieldValue('defaultCompanyId');
+                    if (!currentDefault || !(ids || []).includes(currentDefault)) {
+                      form.setFieldsValue({ defaultCompanyId: (ids || [])[0] });
+                    }
+                  }}
+                />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item
-                name="department"
-                label="Phòng ban"
-              >
-                <Input />
+              <Form.Item shouldUpdate={(prev, cur) => prev.companyIds !== cur.companyIds} noStyle>
+                {() => {
+                  const ids = form.getFieldValue('companyIds') || [];
+                  const opts = (companyOptions || []).filter((o) => ids.includes(o.value));
+                  return (
+                    <Form.Item
+                      name="defaultCompanyId"
+                      label="Công ty mặc định"
+                      rules={[{ required: true, message: 'Vui lòng chọn công ty mặc định' }]}
+                    >
+                      <Select disabled={!ids.length} options={opts} />
+                    </Form.Item>
+                  );
+                }}
               </Form.Item>
             </Col>
           </Row>
@@ -801,17 +875,25 @@ const Users = () => {
           <Row gutter={16}>
              <Col span={12}>
               <Form.Item
-                name="position"
-                label="Chức danh"
+                name="department"
+                label="Phòng ban"
               >
                 <Input />
               </Form.Item>
             </Col>
             <Col span={12}>
               <Form.Item
-                name="status"
-                label="Trạng thái"
+                name="position"
+                label="Chức danh"
               >
+                <Input />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item name="status" label="Trạng thái">
                 <Select>
                   <Option value="active">Hoạt động</Option>
                   <Option value="locked">Khóa</Option>

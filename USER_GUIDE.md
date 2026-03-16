@@ -138,12 +138,79 @@ Theo dõi dòng tiền vào (Thu) và ra (Chi) của doanh nghiệp.
     *   **Quản lý giao dịch**: Thêm mới, sửa, xóa các giao dịch thu/chi.
     *   **Bộ lọc**: Tìm kiếm theo từ khóa, lọc theo loại (Thu/Chi).
 
+---
+
+## 8. Chấm công dự án (Scheduling)
+Mục **Chấm công dự án** giúp lập lịch phân công nhân sự theo từng ngày cho danh sách công ty trong một khoảng thời gian dự án. Kết quả có thể xuất ra Excel để gửi nội bộ hoặc dùng làm bảng theo dõi.
+
+### 8.1. Tham số đầu vào
+1.  **Danh sách Công ty (Mỗi dòng 1 công ty)**:
+    *   Nhập danh sách công ty/đối tác cần đi công tác theo dự án.
+    *   Mỗi dòng là một tên công ty.
+
+2.  **Nhóm nhân sự cố định**:
+    *   **Sở hữu trí tuệ**: mỗi dòng 1 nhân sự.
+    *   **Phát triển thị trường**: mỗi dòng 1 nhân sự.
+
+3.  **Các nhóm nhân sự khác (tuỳ chọn)**:
+    *   Nhấn **Thêm nhóm nhân sự** để tạo thêm nhóm (ví dụ: “Kế toán”, “Pháp chế”, “Hành chính”…).
+    *   Mỗi nhóm gồm:
+        *   Tên nhóm
+        *   Danh sách nhân sự (mỗi dòng 1 người)
+
+4.  **Số ngày công / cty**:
+    *   Là số “lượt” cần làm việc cho mỗi công ty trong toàn dự án.
+    *   Ví dụ: nhập `28` nghĩa là mỗi công ty cần 28 ngày công trong phạm vi dự án.
+
+5.  **Thời gian dự án**:
+    *   Chọn khoảng ngày bắt đầu/kết thúc.
+    *   Hệ thống tự tạo lịch theo từng ngày trong khoảng thời gian này.
+
+### 8.2. Quy tắc xếp lịch
+*   **Mỗi lượt công ty cần đủ người ở tất cả nhóm**:
+    *   Mỗi dòng lịch (một công ty trong một ngày) sẽ gán 1 nhân sự ở từng nhóm.
+    *   Do đó số “team” tối đa mỗi ngày bị giới hạn bởi nhóm có ít nhân sự nhất.
+*   **Chủ nhật nghỉ**:
+    *   Các ngày Chủ nhật được đánh dấu nghỉ và không phân công.
+*   **Giới hạn 22 ngày/tháng/nhân sự**:
+    *   Một nhân sự không được phân công quá 22 ngày trong cùng một tháng.
+*   **Ưu tiên công ty thiếu nhiều nhất**:
+    *   Thuật toán ưu tiên xếp những công ty còn thiếu nhiều ngày công trước.
+
+### 8.3. Thao tác sử dụng
+1.  Nhập danh sách công ty và danh sách nhân sự theo nhóm.
+2.  Nhập **Số ngày công / cty** và **Thời gian dự án**.
+3.  (Tuỳ chọn) Nhấn **Dữ liệu mẫu** để tự điền dữ liệu demo.
+4.  Nhấn **Xếp Lịch** để tạo lịch.
+5.  Xem kết quả ở bảng **Kết quả lịch trình** và khối **Thống kê kết quả**.
+
+### 8.4. Thống kê kết quả (giải thích)
+*   **Tổng nhu cầu (ngày làm việc)**:
+    *   Công thức: `Số công ty * Số ngày công / cty`.
+*   **Đáp ứng được (ngày làm việc)**:
+    *   Số ngày công mà hệ thống xếp được với nguồn lực hiện có trong phạm vi dự án.
+*   **Thiếu (shortage)**:
+    *   Nếu > 0 nghĩa là lịch vẫn thiếu so với nhu cầu.
+    *   Hệ thống hiển thị gợi ý nhóm nào đang là “nút thắt” và cần thêm bao nhiêu người.
+
+### 8.5. Xuất Excel
+Nhấn **Xuất Excel** để tải file `.xlsx`:
+*   Sheet **Lịch Phân Công**:
+    *   Dạng bảng theo tuần (block 7 ngày).
+    *   Ô ngày chứa danh sách phân công theo từng nhóm (nhiều dòng).
+*   Các sheet theo từng nhân sự:
+    *   Mỗi nhân sự có 1 sheet lịch công tác cá nhân (ngày, thứ, thứ tự ngày làm việc, công ty).
+
+### 8.6. Phân quyền
+Quyền thao tác mục này được cấu hình trong **Quản lý Phân quyền** → tab **Chấm công dự án**. Tuỳ theo vai trò, có thể bị giới hạn:
+*   Chỉ xem kết quả (không được xếp lịch / xuất Excel)
+*   Không được xem module (ẩn hoàn toàn)
+
 
 
 ---
 
 ## 11. Cấu hình Email (Dành cho Admin/Kỹ thuật)
-Để hệ thống có thể gửi email thông báo, bạn cần thiết lập App Password của Gmail. Dưới đây là hướng dẫn lấy App Password:
 
 1.  Truy cập trang [Tài khoản Google](https://myaccount.google.com/).
 2.  Chọn mục **Bảo mật** (Security) ở menu bên trái.

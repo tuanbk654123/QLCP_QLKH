@@ -17,7 +17,7 @@ public class PermissionsController : ControllerBase
     }
 
     [HttpGet]
-    [Authorize(Roles = "admin,ceo")]
+    [Authorize(Roles = "admin,ceo,assistant_ceo")]
     public async Task<ActionResult<object>> GetPermissions()
     {
         var matrix = await _permissionService.GetPermissionMatrixAsync();
@@ -105,7 +105,7 @@ public class PermissionsController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "admin,ceo")]
+    [Authorize(Roles = "admin,ceo,assistant_ceo")]
     public async Task<ActionResult> SavePermissions(
         [FromBody] Dictionary<string, Dictionary<string, Dictionary<string, string>>> permissions)
     {

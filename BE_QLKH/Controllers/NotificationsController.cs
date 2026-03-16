@@ -16,6 +16,7 @@ public class NotificationsController : ControllerBase
 {
     private readonly IMongoCollection<Notification> _notifications;
     private readonly IMongoCollection<User> _users;
+    private readonly IMongoCollection<UserCompany> _userCompanies;
     private readonly IHubContext<NotificationsHub> _hubContext;
     private readonly IEmailService _emailService;
 
@@ -28,6 +29,7 @@ public class NotificationsController : ControllerBase
         var db = client.GetDatabase(options.Value.DatabaseName);
         _notifications = db.GetCollection<Notification>("notifications");
         _users = db.GetCollection<User>("users");
+        _userCompanies = db.GetCollection<UserCompany>("user_companies");
         _hubContext = hubContext;
         _emailService = emailService;
     }
@@ -35,13 +37,15 @@ public class NotificationsController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<object>> GetNotifications([FromQuery] int page = 1)
     {
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
         var userIdStr = User.FindFirst("legacy_id")?.Value;
         if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var userId))
         {
             return Unauthorized();
         }
 
-        var filter = Builders<Notification>.Filter.Eq(n => n.UserId, userId);
+        var filter = Builders<Notification>.Filter.Eq(n => n.UserId, userId) &
+                     TenantContext.CompanyFilter<Notification>(companyId);
         var total = await _notifications.CountDocumentsAsync(filter);
         
         var notifications = await _notifications.Find(filter)
@@ -53,7 +57,8 @@ public class NotificationsController : ControllerBase
         var unreadCount = await _notifications.CountDocumentsAsync(
             Builders<Notification>.Filter.And(
                 Builders<Notification>.Filter.Eq(n => n.UserId, userId),
-                Builders<Notification>.Filter.Eq(n => n.IsRead, false)
+                Builders<Notification>.Filter.Eq(n => n.IsRead, false),
+                TenantContext.CompanyFilter<Notification>(companyId)
             )
         );
 
@@ -68,6 +73,7 @@ public class NotificationsController : ControllerBase
     [HttpPost("mark-read/{id}")]
     public async Task<ActionResult<object>> MarkAsRead(string id)
     {
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
          var userIdStr = User.FindFirst("legacy_id")?.Value;
         if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var userId))
         {
@@ -76,7 +82,8 @@ public class NotificationsController : ControllerBase
 
         var filter = Builders<Notification>.Filter.And(
             Builders<Notification>.Filter.Eq(n => n.Id, id),
-            Builders<Notification>.Filter.Eq(n => n.UserId, userId)
+            Builders<Notification>.Filter.Eq(n => n.UserId, userId),
+            TenantContext.CompanyFilter<Notification>(companyId)
         );
         
         var update = Builders<Notification>.Update.Set(n => n.IsRead, true);
@@ -91,13 +98,15 @@ public class NotificationsController : ControllerBase
     [HttpPost("mark-all-read")]
     public async Task<ActionResult<object>> MarkAllAsRead()
     {
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
          var userIdStr = User.FindFirst("legacy_id")?.Value;
         if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var userId))
         {
             return Unauthorized();
         }
 
-        var filter = Builders<Notification>.Filter.Eq(n => n.UserId, userId);
+        var filter = Builders<Notification>.Filter.Eq(n => n.UserId, userId) &
+                     TenantContext.CompanyFilter<Notification>(companyId);
         var update = Builders<Notification>.Update.Set(n => n.IsRead, true);
         
         await _notifications.UpdateManyAsync(filter, update);
@@ -108,12 +117,17 @@ public class NotificationsController : ControllerBase
     [HttpPost("create")]
     public async Task<ActionResult<object>> CreateNotification([FromBody] CreateNotificationRequest request)
     {
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
         var createdCount = 0;
         foreach (var userId in request.UserIds)
         {
+             var ok = await _userCompanies.Find(x => x.UserLegacyId == userId && x.CompanyId == companyId).AnyAsync();
+             if (!ok) continue;
              var notif = new Notification
              {
+                 Id = MongoDB.Bson.ObjectId.GenerateNewId().ToString(),
                  UserId = userId,
+                 CompanyId = companyId,
                  Title = request.Title,
                  Message = request.Message,
                  Type = request.Type,

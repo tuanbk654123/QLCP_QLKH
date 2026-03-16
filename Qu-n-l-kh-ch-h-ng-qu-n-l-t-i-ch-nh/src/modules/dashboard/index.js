@@ -23,6 +23,7 @@ import {
 } from 'recharts';
 import axios from 'axios';
 import dayjs from 'dayjs';
+import { useAuth } from '../../context/AuthContext';
 import './index.css';
 
 const { RangePicker } = DatePicker;
@@ -31,6 +32,7 @@ const { Option } = Select;
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#FF6666', '#AAAAAA'];
 
 const Dashboard = () => {
+  const { getPermissionLevel } = useAuth();
   const [stats, setStats] = useState({
     totalCustomers: 0,
     totalRevenue: 0,
@@ -44,19 +46,21 @@ const Dashboard = () => {
   const [custYear, setCustYear] = useState(dayjs().year());
   const [projMonth, setProjMonth] = useState(dayjs().month() + 1);
   const [projYear, setProjYear] = useState(dayjs().year());
+  const [scope, setScope] = useState('company');
+  const canViewAll = !!getPermissionLevel('dashboard', 'overview_all');
 
   useEffect(() => {
     fetchStats();
     fetchTransactions();
-  }, [dateRange]);
+  }, [dateRange, scope]);
 
   useEffect(() => {
     fetchCustomerGrowth();
-  }, [custYear]);
+  }, [custYear, scope]);
 
   useEffect(() => {
     fetchProjectCosts();
-  }, [projMonth, projYear]);
+  }, [projMonth, projYear, scope]);
 
   const fetchStats = async () => {
     try {
@@ -72,12 +76,12 @@ const Dashboard = () => {
         params.toDate = to.format('YYYY-MM-DD');
       }
 
-      const response = await axios.get('/api/dashboard/overview', {
-        params,
-      });
+      const allResponse = scope === 'all'
+        ? await axios.get('/api/dashboard/overview-all', { params })
+        : await axios.get('/api/dashboard/overview', { params });
       setStats({
-        totalCustomers: response.data.totalCustomers,
-        totalRevenue: response.data.totalRevenue,
+        totalCustomers: allResponse.data.totalCustomers,
+        totalRevenue: allResponse.data.totalRevenue,
       });
     } catch (error) {
       console.error('Lỗi khi tải thống kê:', error);
@@ -93,10 +97,13 @@ const Dashboard = () => {
         params.toDate = to.format('YYYY-MM-DD');
       }
 
-      const response = await axios.get('/api/dashboard/transactions', {
-        params,
-      });
-      setTransactions(response.data.transactions);
+      if (scope === 'all') {
+        const allRes = await axios.get('/api/dashboard/transactions-all', { params });
+        setTransactions(allRes.data.transactions);
+      } else {
+        const response = await axios.get('/api/dashboard/transactions', { params });
+        setTransactions(response.data.transactions);
+      }
     } catch (error) {
       console.error('Lỗi khi tải giao dịch:', error);
     }
@@ -104,10 +111,17 @@ const Dashboard = () => {
 
   const fetchCustomerGrowth = async () => {
     try {
-      const response = await axios.get('/api/dashboard/customer-growth', {
-        params: { year: custYear }
-      });
-      setCustomerStats(response.data);
+      if (scope === 'all') {
+        const response = await axios.get('/api/dashboard/customer-growth-all', {
+          params: { year: custYear }
+        });
+        setCustomerStats(response.data);
+      } else {
+        const response = await axios.get('/api/dashboard/customer-growth', {
+          params: { year: custYear }
+        });
+        setCustomerStats(response.data);
+      }
     } catch (error) {
       console.error('Lỗi khi tải thống kê khách hàng:', error);
     }
@@ -115,10 +129,17 @@ const Dashboard = () => {
 
   const fetchProjectCosts = async () => {
     try {
-      const response = await axios.get('/api/dashboard/project-costs', {
-        params: { month: projMonth, year: projYear }
-      });
-      setProjectStats(response.data);
+      if (scope === 'all') {
+        const response = await axios.get('/api/dashboard/project-costs-all', {
+          params: { month: projMonth, year: projYear }
+        });
+        setProjectStats(response.data);
+      } else {
+        const response = await axios.get('/api/dashboard/project-costs', {
+          params: { month: projMonth, year: projYear }
+        });
+        setProjectStats(response.data);
+      }
     } catch (error) {
       console.error('Lỗi khi tải thống kê chi phí dự án:', error);
     }
@@ -176,8 +197,19 @@ const Dashboard = () => {
   return (
     <div className="dashboard-container">
       <div className="dashboard-header">
-        <h1>Dashboard - Tổng quan hệ thống</h1>
+        <h1>{scope === 'all' ? 'Dashboard - Tổng quan (Tất cả công ty)' : 'Dashboard - Tổng quan hệ thống'}</h1>
         <div className="dashboard-controls">
+          {canViewAll && (
+            <Select
+              value={scope}
+              style={{ width: 220, marginRight: 12 }}
+              onChange={setScope}
+              options={[
+                { value: 'company', label: 'Theo công ty đang chọn' },
+                { value: 'all', label: 'Tổng các công ty' },
+              ]}
+            />
+          )}
           <Select
             defaultValue="all"
             style={{ width: 170, marginRight: 12 }}

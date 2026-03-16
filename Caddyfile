@@ -6,6 +6,16 @@ crm.anneco.vn {
 		reverse_proxy backend:8080
 	}
 
+	@minio path /minio/*
+	handle_path @minio {
+		reverse_proxy minio:9000
+	}
+
+	@minio_console path /minio-console/*
+	handle_path @minio_console {
+		reverse_proxy minio:9001
+	}
+
 	handle {
 		reverse_proxy frontend:80
 	}

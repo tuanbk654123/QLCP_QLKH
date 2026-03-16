@@ -44,12 +44,34 @@ public class DatabaseSeeder : IHostedService
         await EnsureCollection("nsnn_sources");
         await EnsureCollection("project_codes");
         await EnsureCollection("audit_logs");
+        await EnsureCollection("notifications");
+        await EnsureCollection("companies");
+        await EnsureCollection("user_companies");
+
+        var now = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
+
+        var companiesCollection = db.GetCollection<Company>("companies");
+        if (await companiesCollection.CountDocumentsAsync(_ => true, cancellationToken: cancellationToken) == 0)
+        {
+            var defaultCompanies = new List<Company>
+            {
+                new Company { Id = ObjectId.GenerateNewId().ToString(), Code = "CTYA", Name = "Công ty A", Status = "active", CreatedAt = now, UpdatedAt = now, CreatedBy = 0, UpdatedBy = 0 },
+                new Company { Id = ObjectId.GenerateNewId().ToString(), Code = "CTYB", Name = "Công ty B", Status = "active", CreatedAt = now, UpdatedAt = now, CreatedBy = 0, UpdatedBy = 0 },
+                new Company { Id = ObjectId.GenerateNewId().ToString(), Code = "CTYC", Name = "Công ty C", Status = "active", CreatedAt = now, UpdatedAt = now, CreatedBy = 0, UpdatedBy = 0 }
+            };
+
+            await companiesCollection.InsertManyAsync(defaultCompanies, cancellationToken: cancellationToken);
+        }
+
+        var defaultCompany = await companiesCollection.Find(c => c.Code == "CTYA").FirstOrDefaultAsync(cancellationToken) ??
+                             await companiesCollection.Find(_ => true).SortBy(c => c.Code).FirstOrDefaultAsync(cancellationToken);
+
+        var defaultCompanyId = defaultCompany?.Id ?? string.Empty;
+        var defaultCompanyName = defaultCompany?.Name ?? string.Empty;
 
         var usersCollection = db.GetCollection<User>("users");
         if (await usersCollection.CountDocumentsAsync(_ => true, cancellationToken: cancellationToken) == 0)
         {
-            var now = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
-
             var defaultUsers = new List<User>
             {
                 new User
@@ -62,6 +84,8 @@ public class DatabaseSeeder : IHostedService
                     Email = "admin@example.com",
                     PasswordHash = HashPassword("123456"),
                     RoleCode = "admin",
+                    Company = defaultCompanyName,
+                    CompanyId = defaultCompanyId,
                     Status = "active",
                     CreatedAt = now,
                     UpdatedAt = now,
@@ -78,6 +102,8 @@ public class DatabaseSeeder : IHostedService
                     Email = "ceo@example.com",
                     PasswordHash = HashPassword("123456"),
                     RoleCode = "ceo",
+                    Company = defaultCompanyName,
+                    CompanyId = defaultCompanyId,
                     Status = "active",
                     CreatedAt = now,
                     UpdatedAt = now,
@@ -94,6 +120,8 @@ public class DatabaseSeeder : IHostedService
                     Email = "director@example.com",
                     PasswordHash = HashPassword("123456"),
                     RoleCode = "director",
+                    Company = defaultCompanyName,
+                    CompanyId = defaultCompanyId,
                     Status = "active",
                     CreatedAt = now,
                     UpdatedAt = now,
@@ -110,6 +138,8 @@ public class DatabaseSeeder : IHostedService
                     Email = "accountant@example.com",
                     PasswordHash = HashPassword("123456"),
                     RoleCode = "accountant",
+                    Company = defaultCompanyName,
+                    CompanyId = defaultCompanyId,
                     Status = "active",
                     CreatedAt = now,
                     UpdatedAt = now,
@@ -166,6 +196,12 @@ public class DatabaseSeeder : IHostedService
                 }
             };
 
+            foreach (var u in defaultUsers)
+            {
+                if (string.IsNullOrWhiteSpace(u.CompanyId)) u.CompanyId = defaultCompanyId;
+                if (string.IsNullOrWhiteSpace(u.Company)) u.Company = defaultCompanyName;
+            }
+
             await usersCollection.InsertManyAsync(defaultUsers, cancellationToken: cancellationToken);
         }
 
@@ -198,6 +234,11 @@ public class DatabaseSeeder : IHostedService
                 new ProjectCode { Id = ObjectId.GenerateNewId().ToString(), LegacyId = 5, Code = "SNNLD25MTQG", CreatedAt = today, UpdatedAt = today },
                 new ProjectCode { Id = ObjectId.GenerateNewId().ToString(), LegacyId = 6, Code = "Dịch vụ SHTT", CreatedAt = today, UpdatedAt = today },
             };
+
+            foreach (var p in projectCodes)
+            {
+                p.CompanyId = defaultCompanyId;
+            }
 
             await projectCodesCollection.InsertManyAsync(projectCodes, cancellationToken: cancellationToken);
         }
@@ -510,6 +551,11 @@ public class DatabaseSeeder : IHostedService
                 }
             };
 
+            foreach (var c in customers)
+            {
+                c.CompanyId = defaultCompanyId;
+            }
+
             await customersCollection.InsertManyAsync(customers, cancellationToken: cancellationToken);
         }
         else
@@ -607,6 +653,11 @@ public class DatabaseSeeder : IHostedService
                         NsnnSource = ""
                     }
                 };
+
+                foreach (var c in additionalCustomers)
+                {
+                    c.CompanyId = defaultCompanyId;
+                }
                 await customersCollection.InsertManyAsync(additionalCustomers, cancellationToken: cancellationToken);
             }
         }
@@ -1012,24 +1063,43 @@ public class DatabaseSeeder : IHostedService
                 }
             };
 
+            foreach (var c in costs)
+            {
+                c.CompanyId = defaultCompanyId;
+            }
+
             await costsCollection.InsertManyAsync(costs, cancellationToken: cancellationToken);
         }
 
         var rolesCollection = db.GetCollection<Role>("roles");
-        if (await rolesCollection.CountDocumentsAsync(_ => true, cancellationToken: cancellationToken) == 0)
+        var defaultRoles = new List<Role>
         {
-            var defaultRoles = new List<Role>
-            {
-                new Role { Code = "marketing_sales", Name = "Marketing/Sales", IsActive = true },
-                new Role { Code = "ip_executive", Name = "IP Executive", IsActive = true },
-                new Role { Code = "ip_manager", Name = "IP Manager", IsActive = true },
-                new Role { Code = "accountant", Name = "Kế toán", IsActive = true },
-                new Role { Code = "director", Name = "Giám đốc", IsActive = true },
-                new Role { Code = "ceo", Name = "Tổng giám đốc", IsActive = true },
-                new Role { Code = "admin", Name = "Admin", IsActive = true }
-            };
+            new Role { Code = "marketing_sales", Name = "Marketing/Sales", IsActive = true },
+            new Role { Code = "ip_executive", Name = "IP Executive", IsActive = true },
+            new Role { Code = "ip_manager", Name = "IP Manager", IsActive = true },
+            new Role { Code = "accountant", Name = "Kế toán", IsActive = true },
+            new Role { Code = "director", Name = "Giám đốc", IsActive = true },
+            new Role { Code = "ceo", Name = "Tổng giám đốc", IsActive = true },
+            new Role { Code = "assistant_ceo", Name = "Trợ lý TGĐ", IsActive = true },
+            new Role { Code = "hr", Name = "Nhân sự", IsActive = true },
+            new Role { Code = "assistant_director", Name = "Trợ lý GĐ", IsActive = true },
+            new Role { Code = "admin", Name = "Admin", IsActive = true }
+        };
 
-            await rolesCollection.InsertManyAsync(defaultRoles, cancellationToken: cancellationToken);
+        foreach (var r in defaultRoles)
+        {
+            var existing = await rolesCollection.Find(x => x.Code == r.Code).FirstOrDefaultAsync(cancellationToken);
+            if (existing == null)
+            {
+                r.Id = ObjectId.GenerateNewId().ToString();
+                await rolesCollection.InsertOneAsync(r, cancellationToken: cancellationToken);
+            }
+            else
+            {
+                existing.Name = r.Name;
+                existing.IsActive = r.IsActive;
+                await rolesCollection.ReplaceOneAsync(x => x.Id == existing.Id, existing, cancellationToken: cancellationToken);
+            }
         }
 
         var modulesCollection = db.GetCollection<ModuleDef>("modules");
@@ -1453,7 +1523,7 @@ public class DatabaseSeeder : IHostedService
         }
 
         // 6. Ensure export_doc permissions exist (A for all roles as per request)
-        var rolesList = new[] { "marketing_sales", "ip_executive", "ip_manager", "accountant", "director", "ceo", "admin" };
+        var rolesList = new[] { "marketing_sales", "ip_executive", "ip_manager", "accountant", "director", "assistant_director", "ceo", "assistant_ceo", "hr", "admin" };
         foreach (var role in rolesList)
         {
             var permLevel = "A";
@@ -1517,7 +1587,10 @@ public class DatabaseSeeder : IHostedService
             ("qlkh", "ip_manager", "R"),
             ("qlkh", "accountant", "N"),
             ("qlkh", "director", "R"),
+            ("qlkh", "assistant_director", "R"),
             ("qlkh", "ceo", "A"),
+            ("qlkh", "assistant_ceo", "A"),
+            ("qlkh", "hr", "R"),
             ("qlkh", "admin", "A"),
 
             ("qlcp", "marketing_sales", "R"),
@@ -1525,7 +1598,10 @@ public class DatabaseSeeder : IHostedService
             ("qlcp", "ip_manager", "R"),
             ("qlcp", "accountant", "R"),
             ("qlcp", "director", "R"),
+            ("qlcp", "assistant_director", "R"),
             ("qlcp", "ceo", "A"),
+            ("qlcp", "assistant_ceo", "A"),
+            ("qlcp", "hr", "R"),
             ("qlcp", "admin", "A"),
         };
 
@@ -1570,6 +1646,9 @@ public class DatabaseSeeder : IHostedService
             ("accountant", "N"),
             ("director", "R"),
             ("ceo", "R"),
+            ("assistant_ceo", "R"),
+            ("assistant_director", "R"),
+            ("hr", "R"),
             ("admin", "A"),
         };
 
@@ -1582,6 +1661,152 @@ public class DatabaseSeeder : IHostedService
                 new UpdateOptions { IsUpsert = true },
                 cancellationToken
             );
+        }
+
+        var dashboardAllField = new FieldDef
+        {
+            ModuleCode = "dashboard",
+            Code = "overview_all",
+            Label = "Dashboard tổng (tất cả công ty)",
+            GroupCode = "group_dashboard",
+            GroupLabel = "I. Dashboard",
+            OrderIndex = 3
+        };
+
+        var existingDashAll = await fieldsCollection.Find(f => f.ModuleCode == "dashboard" && f.Code == "overview_all").FirstOrDefaultAsync(cancellationToken);
+        if (existingDashAll != null)
+        {
+            dashboardAllField.Id = existingDashAll.Id;
+            await fieldsCollection.ReplaceOneAsync(f => f.Id == existingDashAll.Id, dashboardAllField, new ReplaceOptions { IsUpsert = true }, cancellationToken);
+        }
+        else
+        {
+            dashboardAllField.Id = ObjectId.GenerateNewId().ToString();
+            await fieldsCollection.InsertOneAsync(dashboardAllField, cancellationToken: cancellationToken);
+        }
+
+        var dashAllPerms = new List<(string RoleCode, string Level)>
+        {
+            ("ceo", "R"),
+            ("assistant_ceo", "R"),
+            ("hr", "R"),
+            ("admin", "R"),
+        };
+
+        foreach (var (roleCode, level) in dashAllPerms)
+        {
+            var permUpdate = Builders<FieldPermission>.Update.Set(p => p.PermissionLevel, level);
+            await fpCollection.UpdateOneAsync(
+                p => p.ModuleCode == "dashboard" && p.FieldCode == "overview_all" && p.RoleCode == roleCode,
+                permUpdate,
+                new UpdateOptions { IsUpsert = true },
+                cancellationToken
+            );
+        }
+
+        var ceoPerms = await fpCollection.Find(p => p.RoleCode == "ceo").ToListAsync(cancellationToken);
+        foreach (var p in ceoPerms)
+        {
+            var permUpdate = Builders<FieldPermission>.Update.Set(x => x.PermissionLevel, p.PermissionLevel);
+            await fpCollection.UpdateOneAsync(
+                x => x.ModuleCode == p.ModuleCode && x.FieldCode == p.FieldCode && x.RoleCode == "assistant_ceo",
+                permUpdate,
+                new UpdateOptions { IsUpsert = true },
+                cancellationToken
+            );
+        }
+
+        var directorPerms = await fpCollection.Find(p => p.RoleCode == "director").ToListAsync(cancellationToken);
+        foreach (var p in directorPerms)
+        {
+            var permUpdate = Builders<FieldPermission>.Update.Set(x => x.PermissionLevel, p.PermissionLevel);
+            await fpCollection.UpdateOneAsync(
+                x => x.ModuleCode == p.ModuleCode && x.FieldCode == p.FieldCode && x.RoleCode == "assistant_director",
+                permUpdate,
+                new UpdateOptions { IsUpsert = true },
+                cancellationToken
+            );
+        }
+
+        var usersFieldCodesForLimitedRoles = new[] { "list", "detail", "create", "update", "delete" };
+        foreach (var fieldCode in usersFieldCodesForLimitedRoles)
+        {
+            var permUpdate = Builders<FieldPermission>.Update.Set(x => x.PermissionLevel, "N");
+            await fpCollection.UpdateOneAsync(
+                x => x.ModuleCode == "users" && x.FieldCode == fieldCode && x.RoleCode == "assistant_director",
+                permUpdate,
+                new UpdateOptions { IsUpsert = true },
+                cancellationToken
+            );
+            await fpCollection.UpdateOneAsync(
+                x => x.ModuleCode == "users" && x.FieldCode == fieldCode && x.RoleCode == "hr",
+                permUpdate,
+                new UpdateOptions { IsUpsert = true },
+                cancellationToken
+            );
+        }
+
+        var modulesToDisableForHr = new[] { ("qlkh", "auditLog"), ("qlcp", "auditLog"), ("audit", "view"), ("export", "export_doc"), ("scheduling", "view"), ("scheduling", "export"), ("scheduling", "generate"), ("scheduling", "seedData"), ("scheduling", "config") };
+        foreach (var (moduleCode, fieldCode) in modulesToDisableForHr)
+        {
+            var permUpdate = Builders<FieldPermission>.Update.Set(x => x.PermissionLevel, "N");
+            await fpCollection.UpdateOneAsync(
+                x => x.ModuleCode == moduleCode && x.FieldCode == fieldCode && x.RoleCode == "hr",
+                permUpdate,
+                new UpdateOptions { IsUpsert = true },
+                cancellationToken
+            );
+        }
+
+        if (!string.IsNullOrWhiteSpace(defaultCompanyId))
+        {
+            var missingCompanyFilter = Builders<BsonDocument>.Filter.Or(
+                Builders<BsonDocument>.Filter.Exists("company_id", false),
+                Builders<BsonDocument>.Filter.Eq("company_id", ""),
+                Builders<BsonDocument>.Filter.Eq("company_id", BsonNull.Value)
+            );
+
+            var setDefaultCompany = Builders<BsonDocument>.Update.Set("company_id", defaultCompanyId);
+
+            await db.GetCollection<BsonDocument>("customers").UpdateManyAsync(missingCompanyFilter, setDefaultCompany, cancellationToken: cancellationToken);
+            await db.GetCollection<BsonDocument>("costs").UpdateManyAsync(missingCompanyFilter, setDefaultCompany, cancellationToken: cancellationToken);
+            await db.GetCollection<BsonDocument>("audit_logs").UpdateManyAsync(missingCompanyFilter, setDefaultCompany, cancellationToken: cancellationToken);
+            await db.GetCollection<BsonDocument>("project_codes").UpdateManyAsync(missingCompanyFilter, setDefaultCompany, cancellationToken: cancellationToken);
+            await db.GetCollection<BsonDocument>("notifications").UpdateManyAsync(missingCompanyFilter, setDefaultCompany, cancellationToken: cancellationToken);
+
+            var usersMissingCompanyFilter = Builders<BsonDocument>.Filter.Or(
+                Builders<BsonDocument>.Filter.Exists("company_id", false),
+                Builders<BsonDocument>.Filter.Eq("company_id", ""),
+                Builders<BsonDocument>.Filter.Eq("company_id", BsonNull.Value)
+            );
+            var usersUpdate = Builders<BsonDocument>.Update
+                .Set("company_id", defaultCompanyId)
+                .Set("company", defaultCompanyName);
+            await db.GetCollection<BsonDocument>("users").UpdateManyAsync(usersMissingCompanyFilter, usersUpdate, cancellationToken: cancellationToken);
+        }
+
+        if (!string.IsNullOrWhiteSpace(defaultCompanyId))
+        {
+            var userCompanies = db.GetCollection<UserCompany>("user_companies");
+            var usersForMapping = await usersCollection.Find(_ => true).ToListAsync(cancellationToken);
+            foreach (var u in usersForMapping)
+            {
+                if (string.IsNullOrWhiteSpace(u.CompanyId)) continue;
+                var exists = await userCompanies.Find(x => x.UserLegacyId == u.LegacyId && x.CompanyId == u.CompanyId)
+                    .AnyAsync(cancellationToken);
+                if (exists) continue;
+
+                var doc = new UserCompany
+                {
+                    Id = ObjectId.GenerateNewId().ToString(),
+                    UserLegacyId = u.LegacyId,
+                    CompanyId = u.CompanyId,
+                    IsDefault = true,
+                    CreatedAt = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
+                };
+
+                await userCompanies.InsertOneAsync(doc, cancellationToken: cancellationToken);
+            }
         }
 
         Console.WriteLine("--- CHECKING 2026 DATA ---");
@@ -1613,6 +1838,7 @@ public class DatabaseSeeder : IHostedService
                     {
                         Id = ObjectId.GenerateNewId().ToString(),
                         LegacyId = 1000 + (month * 100) + i,
+                        CompanyId = defaultCompanyId,
                         Name = $"KH 2026 Tháng {month} #{i+1}",
                         Email = $"kh2026_{month}_{i}@example.com",
                         Phone = $"09{month:00}{i:00}0000",
@@ -1682,6 +1908,7 @@ public class DatabaseSeeder : IHostedService
                 {
                     Id = ObjectId.GenerateNewId().ToString(),
                     LegacyId = 2000 + random.Next(1, 10000),
+                    CompanyId = defaultCompanyId,
                     Requester = "Auto Generator",
                     Department = "Kinh doanh",
                     RequestDate = $"2026-01-{random.Next(5, 25):00}",
@@ -1713,6 +1940,7 @@ public class DatabaseSeeder : IHostedService
                 {
                     Id = ObjectId.GenerateNewId().ToString(),
                     LegacyId = 2000 + (month * 100) + random.Next(1, 99),
+                    CompanyId = defaultCompanyId,
                     Requester = "Auto Generator",
                     Department = "Kinh doanh",
                     RequestDate = $"2026-{month:00}-15",

@@ -21,6 +21,7 @@ import {
   DeleteOutlined,
   PlusOutlined,
   SearchOutlined,
+  UploadOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
 import dayjs from 'dayjs';
@@ -47,6 +48,27 @@ const Customers = () => {
   const [activeTab, setActiveTab] = useState('1');
   const [isImplementationDaysManual, setIsImplementationDaysManual] = useState(false);
   const isAutoSettingImplementationDaysRef = useRef(false);
+
+  const handleDocumentUpload = async (options) => {
+    const { onSuccess, onError, file } = options;
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await axios.post('/api/upload?module=qlkh', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      onSuccess(response.data);
+      message.success('Tải file thành công');
+      form.setFieldsValue({ documentLink: response.data.path });
+    } catch (err) {
+      onError({ err });
+      message.error('Tải file thất bại');
+    }
+  };
 
   const onFinishFailed = ({ errorFields }) => {
     if (errorFields.length > 0) {
@@ -858,7 +880,6 @@ const Customers = () => {
             <Form.Item
               name="taxCode"
               label="Mã số thuế"
-              rules={[{ required: true, message: 'Vui lòng nhập mã số thuế' }]}
             >
               <Input disabled={!canEditField('taxCode')} />
             </Form.Item>
@@ -876,7 +897,6 @@ const Customers = () => {
             <Form.Item
               name="representativeName"
               label="Người đại diện"
-              rules={[{ required: true, message: 'Vui lòng nhập người đại diện' }]}
             >
               <Input disabled={!canEditField('representativeName')} />
             </Form.Item>
@@ -885,7 +905,6 @@ const Customers = () => {
             <Form.Item
               name="representativePosition"
               label="Chức vụ"
-              rules={[{ required: true, message: 'Vui lòng nhập chức vụ' }]}
             >
               <Input disabled={!canEditField('representativePosition')} />
             </Form.Item>
@@ -894,7 +913,6 @@ const Customers = () => {
             <Form.Item
               name="idNumber"
               label="CCCD/Hộ chiếu"
-              rules={[{ required: true, message: 'Vui lòng nhập CCCD/Hộ chiếu' }]}
             >
               <Input disabled={!canEditField('idNumber')} />
             </Form.Item>
@@ -1291,9 +1309,17 @@ const Customers = () => {
           <Col span={8}>
             <Form.Item
               name="contractValue"
-              label="Giá trị hợp đồng"
+              label="Giá trị hợp đồng (VND)"
             >
-              <Input type="number" disabled={!canEditField('contractValue')} />
+              <InputNumber
+                style={{ width: '100%' }}
+                disabled={!canEditField('contractValue')}
+                formatter={(value) => {
+                  if (value === null || value === undefined || value === '') return '';
+                  return new Intl.NumberFormat('vi-VN').format(Number(value));
+                }}
+                parser={(value) => (value ? value.replace(/\./g, '').replace(/[^\d]/g, '') : '')}
+              />
             </Form.Item>
           </Col>
           <Col span={8}>
@@ -1395,7 +1421,18 @@ const Customers = () => {
               name="documentLink"
               label="Link hồ sơ giấy tờ"
             >
-              <Input disabled={!canEditField('documentLink')} />
+              <Space.Compact style={{ width: '100%' }}>
+                <Input disabled={!canEditField('documentLink')} />
+                <Upload
+                  customRequest={handleDocumentUpload}
+                  showUploadList={false}
+                  disabled={!canEditField('documentLink')}
+                >
+                  <Button icon={<UploadOutlined />} disabled={!canEditField('documentLink')}>
+                    Upload
+                  </Button>
+                </Upload>
+              </Space.Compact>
             </Form.Item>
           </Col>
         </Row>

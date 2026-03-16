@@ -32,7 +32,9 @@ public class AuditLogsController : ControllerBase
 
         if (!await CanViewAudit()) return StatusCode(403, new { message = "Bạn không có quyền xem lịch sử" });
 
-        var filter = Builders<AuditLog>.Filter.Eq(x => x.EntityType, entityType) &
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
+        var filter = TenantContext.CompanyFilter<AuditLog>(companyId) &
+                     Builders<AuditLog>.Filter.Eq(x => x.EntityType, entityType) &
                      Builders<AuditLog>.Filter.Eq(x => x.EntityLegacyId, entityId);
 
         var items = await _auditLogs.Find(filter).SortByDescending(x => x.CreatedAt).Limit(200).ToListAsync();
@@ -88,7 +90,9 @@ public class AuditLogsController : ControllerBase
 
         if (viewable.Count == 0) return StatusCode(403, new { message = "Bạn không có quyền xem lịch sử" });
 
-        var filter = Builders<AuditLog>.Filter.In(x => x.EntityType, viewable);
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
+        var filter = TenantContext.CompanyFilter<AuditLog>(companyId) &
+                     Builders<AuditLog>.Filter.In(x => x.EntityType, viewable);
 
         if (!string.IsNullOrWhiteSpace(entityType))
         {
@@ -165,7 +169,8 @@ public class AuditLogsController : ControllerBase
         AuditLog? log;
         try
         {
-            log = await _auditLogs.Find(x => x.Id == id).FirstOrDefaultAsync();
+            var companyId = TenantContext.GetCompanyIdOrThrow(User);
+            log = await _auditLogs.Find(TenantContext.CompanyFilter<AuditLog>(companyId) & Builders<AuditLog>.Filter.Eq(x => x.Id, id)).FirstOrDefaultAsync();
         }
         catch (FormatException)
         {

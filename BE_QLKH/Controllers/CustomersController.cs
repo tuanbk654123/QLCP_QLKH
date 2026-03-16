@@ -46,8 +46,10 @@ public class CustomersController : ControllerBase
     {
         if (page < 1) page = 1;
 
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
+
         var builder = Builders<Customer>.Filter;
-        var filter = builder.Empty;
+        var filter = TenantContext.CompanyFilter<Customer>(companyId);
 
         // 1. Global Search
         if (!string.IsNullOrWhiteSpace(search))
@@ -233,7 +235,8 @@ public class CustomersController : ControllerBase
     [HttpGet("{id:int}")]
     public async Task<ActionResult<object>> GetCustomerByLegacyId(int id)
     {
-        var customer = await _customers.Find(c => c.LegacyId == id).FirstOrDefaultAsync();
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
+        var customer = await _customers.Find(TenantContext.CompanyFilter<Customer>(companyId) & Builders<Customer>.Filter.Eq(c => c.LegacyId, id)).FirstOrDefaultAsync();
         if (customer == null) return NotFound(new { message = "Customer not found" });
 
         var userIds = new[] { customer.CreatedBy, customer.UpdatedBy }.Where(x => x > 0).Distinct().ToList();
@@ -316,10 +319,12 @@ public class CustomersController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<object>> CreateCustomer([FromBody] Customer input)
     {
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
         var now = DateTime.Now.ToString("yyyy-MM-dd");
         var actorId = GetActorLegacyId();
 
         input.Id = ObjectId.GenerateNewId().ToString();
+        input.CompanyId = companyId;
         input.CreatedAt = now;
         input.CreatedBy = actorId;
         input.UpdatedAt = now;
@@ -410,7 +415,8 @@ public class CustomersController : ControllerBase
     [HttpPut("{id:int}")]
     public async Task<ActionResult<object>> UpdateCustomer(int id, [FromBody] Customer input)
     {
-        var customer = await _customers.Find(c => c.LegacyId == id).FirstOrDefaultAsync();
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
+        var customer = await _customers.Find(TenantContext.CompanyFilter<Customer>(companyId) & Builders<Customer>.Filter.Eq(c => c.LegacyId, id)).FirstOrDefaultAsync();
         if (customer == null) return NotFound(new { message = "Customer not found" });
 
         var before = JsonSerializer.Deserialize<Customer>(JsonSerializer.Serialize(customer)) ?? customer;
@@ -557,13 +563,14 @@ public class CustomersController : ControllerBase
     [HttpDelete("{id:int}")]
     public async Task<ActionResult<object>> DeleteCustomer(int id)
     {
-        var customer = await _customers.Find(c => c.LegacyId == id).FirstOrDefaultAsync();
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
+        var customer = await _customers.Find(TenantContext.CompanyFilter<Customer>(companyId) & Builders<Customer>.Filter.Eq(c => c.LegacyId, id)).FirstOrDefaultAsync();
         if (customer == null) return NotFound(new { message = "Customer not found" });
 
         var actorId = GetActorLegacyId();
         var actor = actorId > 0 ? await _users.Find(u => u.LegacyId == actorId).FirstOrDefaultAsync() : null;
 
-        var result = await _customers.DeleteOneAsync(c => c.LegacyId == id);
+        var result = await _customers.DeleteOneAsync(TenantContext.CompanyFilter<Customer>(companyId) & Builders<Customer>.Filter.Eq(c => c.LegacyId, id));
         if (result.DeletedCount == 0) return NotFound(new { message = "Customer not found" });
         await _auditLogService.LogAsync("customer", id, "delete", actor, customer, null);
         return Ok(new { message = "Customer deleted" });

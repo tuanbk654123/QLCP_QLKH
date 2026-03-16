@@ -12,6 +12,10 @@ public class Notification
     [BsonElement("user_id")]
     public int UserId { get; set; }
 
+    [BsonElement("company_id")]
+    [BsonRepresentation(BsonType.ObjectId)]
+    public string CompanyId { get; set; } = string.Empty;
+
     [BsonElement("title")]
     public string Title { get; set; } = string.Empty;
 

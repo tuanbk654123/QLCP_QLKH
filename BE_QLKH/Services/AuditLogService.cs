@@ -33,6 +33,7 @@ public class AuditLogService : IAuditLogService
             Id = ObjectId.GenerateNewId().ToString(),
             EntityType = entityType,
             EntityLegacyId = entityLegacyId,
+            CompanyId = GetCompanyId(actor, oldDoc, newDoc),
             Action = action,
             ActorUserId = actor?.LegacyId ?? 0,
             ActorFullName = actor?.FullName ?? string.Empty,
@@ -45,6 +46,25 @@ public class AuditLogService : IAuditLogService
         };
 
         await _auditLogs.InsertOneAsync(log);
+    }
+
+    private static string GetCompanyId(User? actor, BsonDocument? oldDoc, BsonDocument? newDoc)
+    {
+        if (actor != null && !string.IsNullOrWhiteSpace(actor.CompanyId)) return actor.CompanyId;
+
+        if (newDoc != null)
+        {
+            if (newDoc.TryGetValue("companyId", out var v1) && v1.IsString) return v1.AsString;
+            if (newDoc.TryGetValue("company_id", out var v2) && v2.IsString) return v2.AsString;
+        }
+
+        if (oldDoc != null)
+        {
+            if (oldDoc.TryGetValue("companyId", out var v1) && v1.IsString) return v1.AsString;
+            if (oldDoc.TryGetValue("company_id", out var v2) && v2.IsString) return v2.AsString;
+        }
+
+        return string.Empty;
     }
 
     private BsonDocument? ToBson(object? data)

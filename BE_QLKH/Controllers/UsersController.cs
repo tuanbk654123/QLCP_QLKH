@@ -16,11 +16,15 @@ namespace BE_QLKH.Controllers;
 public class UsersController : ControllerBase
 {
     private readonly IMongoCollection<User> _users;
+    private readonly IMongoCollection<Company> _companies;
+    private readonly IMongoCollection<UserCompany> _userCompanies;
 
     public UsersController(IMongoClient client, IOptions<MongoDbSettings> options)
     {
         var db = client.GetDatabase(options.Value.DatabaseName);
         _users = db.GetCollection<User>("users");
+        _companies = db.GetCollection<Company>("companies");
+        _userCompanies = db.GetCollection<UserCompany>("user_companies");
     }
 
     [HttpGet]
@@ -149,6 +153,7 @@ public class UsersController : ControllerBase
             healthInsuranceNumber = u.HealthInsuranceNumber,
             role = u.RoleCode,
             company = u.Company,
+            companyId = u.CompanyId,
             department = u.Department,
             position = u.Position,
             status = u.Status,
@@ -212,6 +217,7 @@ public class UsersController : ControllerBase
             healthInsuranceNumber = user.HealthInsuranceNumber,
             role = user.RoleCode,
             company = user.Company,
+            companyId = user.CompanyId,
             department = user.Department,
             position = user.Position,
             status = user.Status,
@@ -244,11 +250,19 @@ public class UsersController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<object>> CreateUser([FromBody] User input)
     {
+        var companyId = BE_QLKH.Services.TenantContext.GetCompanyIdOrThrow(User);
         var now = DateTime.UtcNow.ToString("yyyy-MM-dd");
 
         input.Id = ObjectId.GenerateNewId().ToString();
+        input.CompanyId = companyId;
         input.CreatedAt = string.IsNullOrEmpty(input.CreatedAt) ? now : input.CreatedAt;
         input.UpdatedAt = input.CreatedAt;
+
+        if (string.IsNullOrWhiteSpace(input.PasswordHash))
+        {
+            var pwd = string.IsNullOrWhiteSpace(input.Password) ? "123456" : input.Password;
+            input.PasswordHash = HashPassword(pwd);
+        }
 
         var maxLegacyId = await _users.Find(_ => true)
             .SortByDescending(u => u.LegacyId)
@@ -263,6 +277,22 @@ public class UsersController : ControllerBase
         }
 
         await _users.InsertOneAsync(input);
+
+        if (!string.IsNullOrWhiteSpace(input.CompanyId))
+        {
+            var exists = await _userCompanies.Find(x => x.UserLegacyId == input.LegacyId && x.CompanyId == input.CompanyId).AnyAsync();
+            if (!exists)
+            {
+                await _userCompanies.InsertOneAsync(new UserCompany
+                {
+                    Id = ObjectId.GenerateNewId().ToString(),
+                    UserLegacyId = input.LegacyId,
+                    CompanyId = input.CompanyId,
+                    IsDefault = true,
+                    CreatedAt = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
+                });
+            }
+        }
 
         return Ok(new
         {
@@ -286,6 +316,7 @@ public class UsersController : ControllerBase
             healthInsuranceNumber = input.HealthInsuranceNumber,
             role = input.RoleCode,
             company = input.Company,
+            companyId = input.CompanyId,
             department = input.Department,
             position = input.Position,
             status = input.Status,
@@ -326,6 +357,8 @@ public class UsersController : ControllerBase
         input.LegacyId = user.LegacyId;
         input.CreatedAt = user.CreatedAt;
         input.CreatedBy = user.CreatedBy;
+        input.CompanyId = string.IsNullOrWhiteSpace(input.CompanyId) ? user.CompanyId : input.CompanyId;
+        input.Company = string.IsNullOrWhiteSpace(input.Company) ? user.Company : input.Company;
         input.UpdatedAt = DateTime.UtcNow.ToString("yyyy-MM-dd");
 
         if (!string.IsNullOrEmpty(input.OffboardDate))
@@ -357,6 +390,7 @@ public class UsersController : ControllerBase
             healthInsuranceNumber = input.HealthInsuranceNumber,
             role = input.RoleCode,
             company = input.Company,
+            companyId = input.CompanyId,
             department = input.Department,
             position = input.Position,
             status = input.Status,
@@ -386,6 +420,120 @@ public class UsersController : ControllerBase
         });
     }
 
+    public class UpdateCompanyRequest
+    {
+        public string CompanyId { get; set; } = string.Empty;
+    }
+
+    [HttpPut("{id:int}/company")]
+    public async Task<ActionResult<object>> UpdateUserCompany(int id, [FromBody] UpdateCompanyRequest req)
+    {
+        if (!CanManageUsersCompanies())
+        {
+            return StatusCode(403, new { message = "Bạn không có quyền" });
+        }
+
+        if (string.IsNullOrWhiteSpace(req.CompanyId)) return BadRequest(new { message = "Thiếu companyId" });
+
+        var user = await _users.Find(u => u.LegacyId == id).FirstOrDefaultAsync();
+        if (user == null) return NotFound(new { message = "User not found" });
+
+        var company = await _companies.Find(c => c.Id == req.CompanyId).FirstOrDefaultAsync();
+        if (company == null) return BadRequest(new { message = "Công ty không tồn tại" });
+
+        var update = Builders<User>.Update
+            .Set(u => u.CompanyId, company.Id)
+            .Set(u => u.Company, company.Name)
+            .Set(u => u.UpdatedAt, DateTime.UtcNow.ToString("yyyy-MM-dd"));
+
+        await _users.UpdateOneAsync(u => u.Id == user.Id, update);
+
+        await _userCompanies.DeleteManyAsync(x => x.UserLegacyId == id);
+        await _userCompanies.InsertOneAsync(new UserCompany
+        {
+            Id = ObjectId.GenerateNewId().ToString(),
+            UserLegacyId = id,
+            CompanyId = company.Id,
+            IsDefault = true,
+            CreatedAt = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
+        });
+
+        return Ok(new { message = "OK" });
+    }
+
+    public class UpdateUserCompaniesRequest
+    {
+        public List<string> CompanyIds { get; set; } = new();
+        public string? DefaultCompanyId { get; set; }
+    }
+
+    [HttpPut("{id:int}/companies")]
+    public async Task<ActionResult<object>> UpdateUserCompanies(int id, [FromBody] UpdateUserCompaniesRequest req)
+    {
+        if (!CanManageUsersCompanies())
+        {
+            return StatusCode(403, new { message = "Bạn không có quyền" });
+        }
+
+        var user = await _users.Find(u => u.LegacyId == id).FirstOrDefaultAsync();
+        if (user == null) return NotFound(new { message = "User not found" });
+
+        var companyIds = (req.CompanyIds ?? new List<string>())
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct()
+            .ToList();
+
+        if (companyIds.Count == 0) return BadRequest(new { message = "Phải chọn ít nhất 1 công ty" });
+
+        var existingCompanies = await _companies.Find(c => companyIds.Contains(c.Id)).ToListAsync();
+        if (existingCompanies.Count != companyIds.Count) return BadRequest(new { message = "Danh sách công ty không hợp lệ" });
+
+        var defaultCompanyId = req.DefaultCompanyId;
+        if (string.IsNullOrWhiteSpace(defaultCompanyId) || !companyIds.Contains(defaultCompanyId))
+        {
+            defaultCompanyId = companyIds[0];
+        }
+
+        var defaultCompany = existingCompanies.First(c => c.Id == defaultCompanyId);
+
+        await _userCompanies.DeleteManyAsync(x => x.UserLegacyId == id);
+        var now = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
+        await _userCompanies.InsertManyAsync(companyIds.Select(cid => new UserCompany
+        {
+            Id = ObjectId.GenerateNewId().ToString(),
+            UserLegacyId = id,
+            CompanyId = cid,
+            IsDefault = cid == defaultCompanyId,
+            CreatedAt = now
+        }).ToList());
+
+        var userUpdate = Builders<User>.Update
+            .Set(u => u.CompanyId, defaultCompany.Id)
+            .Set(u => u.Company, defaultCompany.Name)
+            .Set(u => u.UpdatedAt, DateTime.UtcNow.ToString("yyyy-MM-dd"));
+        await _users.UpdateOneAsync(u => u.Id == user.Id, userUpdate);
+
+        return Ok(new { message = "OK" });
+    }
+
+    [HttpGet("{id:int}/companies")]
+    public async Task<ActionResult<object>> GetUserCompanies(int id)
+    {
+        if (!CanManageUsersCompanies())
+        {
+            return StatusCode(403, new { message = "Bạn không có quyền" });
+        }
+
+        var mappings = await _userCompanies.Find(x => x.UserLegacyId == id).ToListAsync();
+        var companyIds = mappings.Select(x => x.CompanyId).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
+        var companies = companyIds.Count == 0 ? new List<Company>() : await _companies.Find(c => companyIds.Contains(c.Id)).ToListAsync();
+        return Ok(new
+        {
+            items = companies.Select(c => new { id = c.Id, code = c.Code, name = c.Name }).OrderBy(x => x.code).ToList(),
+            defaultCompanyId = mappings.FirstOrDefault(x => x.IsDefault)?.CompanyId
+        });
+    }
+
     [HttpDelete("{id:int}")]
     public async Task<ActionResult<object>> DeleteUser(int id)
     {
@@ -399,5 +547,14 @@ public class UsersController : ControllerBase
         var passwordBytes = Encoding.UTF8.GetBytes(password);
         var hashBytes = SHA256.HashData(passwordBytes);
         return Convert.ToHexString(hashBytes);
+    }
+
+    private bool CanManageUsersCompanies()
+    {
+        var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+        return string.Equals(role, "admin", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(role, "ceo", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(role, "assistant_ceo", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(role, "hr", StringComparison.OrdinalIgnoreCase);
     }
 }

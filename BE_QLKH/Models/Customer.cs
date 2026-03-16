@@ -12,6 +12,10 @@ public class Customer
     [BsonElement("legacy_id")]
     public int LegacyId { get; set; }
 
+    [BsonElement("company_id")]
+    [BsonRepresentation(BsonType.ObjectId)]
+    public string CompanyId { get; set; } = string.Empty;
+
     [BsonElement("name")]
     public string? Name { get; set; }
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   Input,
+  InputNumber,
   Button,
   Space,
   Tag,
@@ -43,6 +44,8 @@ const CostFormModal = ({
   const [rejectReasonModalVisible, setRejectReasonModalVisible] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [activeTab, setActiveTab] = useState('1');
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [approveLoading, setApproveLoading] = useState(false);
   const [projectCodes, setProjectCodes] = useState([]);
   const [projectCodesLoading, setProjectCodesLoading] = useState(false);
   const [projectCodeNewValue, setProjectCodeNewValue] = useState('');
@@ -233,7 +236,7 @@ const CostFormModal = ({
     formData.append('file', file);
 
     try {
-      const response = await axios.post('/api/upload', formData, {
+      const response = await axios.post('/api/upload?module=qlcp', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -260,6 +263,7 @@ const CostFormModal = ({
             cancelText: 'Hủy',
             onOk: async () => {
             try {
+                setApproveLoading(true);
                 // 1. Lưu thông tin phiếu (PUT) để cập nhật các chỉnh sửa (nếu có)
                 // Format lại date
                 const formattedValues = {
@@ -279,18 +283,26 @@ const CostFormModal = ({
                 delete updateData.paymentStatus; 
                 
                 // Update DB
-                await axios.put(`/api/costs/${editingCost.id}`, updateData);
+                await axios.put(`/api/costs/${editingCost.id}`, updateData, { timeout: 10000 });
 
                 // 2. Gọi API Approve để chuyển trạng thái và gửi thông báo
                 const recipients = form.getFieldValue('notificationRecipients') || [];
-                const res = await axios.post(`/api/costs/${editingCost.id}/approve`, {
-                    notificationRecipients: recipients
-                });
+                const res = await axios.post(
+                  `/api/costs/${editingCost.id}/approve`,
+                  { notificationRecipients: recipients },
+                  { timeout: 10000 }
+                );
 
                 message.success(res.data.message || 'Duyệt và lưu thành công');
                 onSuccess();
             } catch (error) {
-                handleApiError(error, 'Lỗi khi duyệt phiếu');
+                if (error?.code === 'ECONNABORTED') {
+                    message.error('Timeout: Quá 10s chưa nhận phản hồi, vui lòng thử lại');
+                } else {
+                    handleApiError(error, 'Lỗi khi duyệt phiếu');
+                }
+            } finally {
+                setApproveLoading(false);
             }
             },
         });
@@ -340,6 +352,7 @@ const CostFormModal = ({
 
   const handleSubmit = async (values) => {
     try {
+      setSubmitLoading(true);
       const formattedValues = {
         ...values,
         requestDate: formatDateValue(values.requestDate),
@@ -350,7 +363,7 @@ const CostFormModal = ({
       };
 
       if (editingCost) {
-        await axios.put(`/api/costs/${editingCost.id}`, formattedValues);
+        await axios.put(`/api/costs/${editingCost.id}`, formattedValues, { timeout: 10000 });
         message.success('Cập nhật phiếu chi thành công');
 
         // Logic xử lý thông báo và email
@@ -474,11 +487,11 @@ const CostFormModal = ({
         }
 
         if (notifData) {
-            await axios.post('/api/notifications/create', notifData);
+            await axios.post('/api/notifications/create', notifData, { timeout: 10000 });
         }
 
       } else {
-        const res = await axios.post('/api/costs', formattedValues);
+        const res = await axios.post('/api/costs', formattedValues, { timeout: 10000 });
         // const newCostId = res.data.id;
         message.success('Tạo phiếu chi thành công');
         
@@ -497,7 +510,13 @@ const CostFormModal = ({
       onSuccess();
       form.resetFields();
     } catch (error) {
-      handleApiError(error, 'Lỗi khi lưu phiếu chi');
+      if (error?.code === 'ECONNABORTED') {
+        message.error('Timeout: Quá 10s chưa nhận phản hồi, vui lòng thử lại');
+      } else {
+        handleApiError(error, 'Lỗi khi lưu phiếu chi');
+      }
+    } finally {
+      setSubmitLoading(false);
     }
   };
 
@@ -720,10 +739,18 @@ const CostFormModal = ({
           <Col span={8}>
             <Form.Item
               name="amountBeforeTax"
-              label="Số tiền (Chưa thuế)"
+              label="Số tiền (Chưa thuế) (VND)"
               rules={[{ required: true, message: 'Vui lòng nhập số tiền' }]}
             >
-              <Input type="number" suffix="VND" disabled={!canEditField('amountBeforeTax')} />
+              <InputNumber
+                style={{ width: '100%' }}
+                disabled={!canEditField('amountBeforeTax')}
+                formatter={(value) => {
+                  if (value === null || value === undefined || value === '') return '';
+                  return new Intl.NumberFormat('vi-VN').format(Number(value));
+                }}
+                parser={(value) => (value ? value.replace(/\./g, '').replace(/[^\d]/g, '') : '')}
+              />
             </Form.Item>
           </Col>
         )}
@@ -747,9 +774,18 @@ const CostFormModal = ({
           <Col span={8}>
             <Form.Item
               name="totalAmount"
-              label="Tổng tiền"
+              label="Tổng tiền (VND)"
             >
-              <Input type="number" suffix="VND" readOnly disabled={!canEditField('totalAmount')} />
+              <InputNumber
+                style={{ width: '100%' }}
+                disabled={!canEditField('totalAmount')}
+                controls={false}
+                formatter={(value) => {
+                  if (value === null || value === undefined || value === '') return '';
+                  return new Intl.NumberFormat('vi-VN').format(Number(value));
+                }}
+                parser={(value) => (value ? value.replace(/\./g, '').replace(/[^\d]/g, '') : '')}
+              />
             </Form.Item>
           </Col>
         )}
@@ -1112,7 +1148,7 @@ const CostFormModal = ({
           (() => {
             if (!editingCost) {
               return (
-                <Button key="submit" type="primary" onClick={form.submit}>
+                <Button key="submit" type="primary" onClick={form.submit} loading={submitLoading}>
                   Gửi duyệt
                 </Button>
               );
@@ -1131,15 +1167,15 @@ const CostFormModal = ({
             if (allowManager || allowDirector || allowAccountant) {
               return (
                 <>
-                  <Button key="reject" danger onClick={handleRejectAction}>
+                  <Button key="reject" danger onClick={handleRejectAction} disabled={approveLoading || submitLoading}>
                     Từ chối
                   </Button>
                   {!isNotificationView && (
-                    <Button key="save" onClick={form.submit} style={{ marginRight: 8, marginLeft: 8 }}>
+                    <Button key="save" onClick={form.submit} style={{ marginRight: 8, marginLeft: 8 }} disabled={approveLoading}>
                       Lưu
                     </Button>
                   )}
-                  <Button key="approve" type="primary" onClick={handleApproveAction}>
+                  <Button key="approve" type="primary" onClick={handleApproveAction} loading={approveLoading}>
                     Duyệt
                   </Button>
                 </>

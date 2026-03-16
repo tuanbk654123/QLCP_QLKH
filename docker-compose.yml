@@ -15,6 +15,7 @@ services:
     depends_on:
       - frontend
       - backend
+      - minio
     networks:
       - qlkh_network
 
@@ -29,6 +30,38 @@ services:
     networks:
       - qlkh_network
 
+  minio:
+    image: minio/minio:latest
+    container_name: qlkh_minio
+    restart: always
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+    volumes:
+      - minio_data:/data
+    networks:
+      - qlkh_network
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: qlkh_minio_init
+    depends_on:
+      - minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      MINIO_BUCKET: ${MINIO_BUCKET:-qlkh-uploads}
+    entrypoint: >
+      /bin/sh -c "
+      until (mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD) do sleep 1; done;
+      mc mb -p local/$$MINIO_BUCKET || true;
+      mc anonymous set download local/$$MINIO_BUCKET || true;
+      exit 0;
+      "
+    networks:
+      - qlkh_network
+
   backend:
     build: ./BE_QLKH
     container_name: qlkh_backend
@@ -37,8 +70,17 @@ services:
       - ASPNETCORE_ENVIRONMENT=Production
       - MongoDb__ConnectionString=mongodb://mongo:27017
       - MongoDb__DatabaseName=QLKH
+      - Storage__Provider=S3
+      - Storage__S3__ServiceUrl=http://minio:9000
+      - Storage__S3__PublicBaseUrl=${MINIO_PUBLIC_BASE_URL:-https://crm.anneco.vn/minio}
+      - Storage__S3__AccessKey=${MINIO_ROOT_USER:-minioadmin}
+      - Storage__S3__SecretKey=${MINIO_ROOT_PASSWORD:-minioadmin123}
+      - Storage__S3__Bucket=${MINIO_BUCKET:-qlkh-uploads}
+      - Storage__S3__ForcePathStyle=true
     depends_on:
       - mongo
+      - minio
+      - minio-init
     networks:
       - qlkh_network
 
@@ -59,3 +101,4 @@ volumes:
   mongo_data:
   caddy_data:
   caddy_config:
+  minio_data:

@@ -31,6 +31,10 @@ public class User
     [BsonElement("password_hash")]
     public string PasswordHash { get; set; } = string.Empty;
 
+    [BsonIgnore]
+    [JsonPropertyName("password")]
+    public string Password { get; set; } = string.Empty;
+
     [BsonElement("full_name")]
     public string FullName { get; set; } = string.Empty;
 
@@ -73,6 +77,10 @@ public class User
 
     [BsonElement("company")]
     public string Company { get; set; } = string.Empty;
+
+    [BsonElement("company_id")]
+    [BsonRepresentation(BsonType.ObjectId)]
+    public string CompanyId { get; set; } = string.Empty;
 
     [BsonElement("department")]
     public string Department { get; set; } = string.Empty;

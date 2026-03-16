@@ -1,4 +1,5 @@
 using BE_QLKH.Models;
+using BE_QLKH.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -30,7 +31,8 @@ public class ProjectCodesController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<object>> List()
     {
-        var items = await _projectCodes.Find(_ => true).SortBy(x => x.LegacyId).ToListAsync();
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
+        var items = await _projectCodes.Find(TenantContext.CompanyFilter<ProjectCode>(companyId)).SortBy(x => x.LegacyId).ToListAsync();
         var result = items.Select(x => new { id = x.LegacyId, code = x.Code }).ToList();
         return Ok(new { items = result });
     }
@@ -43,21 +45,23 @@ public class ProjectCodesController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<object>> Create([FromBody] UpsertRequest req)
     {
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
         if (!IsAdmin()) return StatusCode(403, new { message = "Bạn không có quyền" });
         if (string.IsNullOrWhiteSpace(req.Code)) return BadRequest(new { message = "Mã dự án không được để trống" });
 
         var normalized = req.Code.Trim();
-        var existed = await _projectCodes.Find(x => x.Code == normalized).FirstOrDefaultAsync();
+        var existed = await _projectCodes.Find(TenantContext.CompanyFilter<ProjectCode>(companyId) & Builders<ProjectCode>.Filter.Eq(x => x.Code, normalized)).FirstOrDefaultAsync();
         if (existed != null) return Ok(new { id = existed.LegacyId, code = existed.Code });
 
         var now = DateTime.Now.ToString("yyyy-MM-dd");
-        var maxLegacyId = await _projectCodes.Find(_ => true).SortByDescending(x => x.LegacyId).Limit(1).FirstOrDefaultAsync();
+        var maxLegacyId = await _projectCodes.Find(TenantContext.CompanyFilter<ProjectCode>(companyId)).SortByDescending(x => x.LegacyId).Limit(1).FirstOrDefaultAsync();
         var nextLegacyId = maxLegacyId != null ? maxLegacyId.LegacyId + 1 : 1;
 
         var item = new ProjectCode
         {
             Id = ObjectId.GenerateNewId().ToString(),
             LegacyId = nextLegacyId,
+            CompanyId = companyId,
             Code = normalized,
             CreatedAt = now,
             UpdatedAt = now
@@ -70,27 +74,28 @@ public class ProjectCodesController : ControllerBase
     [HttpPut("{id:int}")]
     public async Task<ActionResult<object>> Update(int id, [FromBody] UpsertRequest req)
     {
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
         if (!IsAdmin()) return StatusCode(403, new { message = "Bạn không có quyền" });
         if (string.IsNullOrWhiteSpace(req.Code)) return BadRequest(new { message = "Mã dự án không được để trống" });
 
-        var item = await _projectCodes.Find(x => x.LegacyId == id).FirstOrDefaultAsync();
+        var item = await _projectCodes.Find(TenantContext.CompanyFilter<ProjectCode>(companyId) & Builders<ProjectCode>.Filter.Eq(x => x.LegacyId, id)).FirstOrDefaultAsync();
         if (item == null) return NotFound(new { message = "Không tìm thấy mã dự án" });
 
         item.Code = req.Code.Trim();
         item.UpdatedAt = DateTime.Now.ToString("yyyy-MM-dd");
 
-        await _projectCodes.ReplaceOneAsync(x => x.Id == item.Id, item);
+        await _projectCodes.ReplaceOneAsync(TenantContext.CompanyFilter<ProjectCode>(companyId) & Builders<ProjectCode>.Filter.Eq(x => x.Id, item.Id), item);
         return Ok(new { id = item.LegacyId, code = item.Code });
     }
 
     [HttpDelete("{id:int}")]
     public async Task<ActionResult<object>> Delete(int id)
     {
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
         if (!IsAdmin()) return StatusCode(403, new { message = "Bạn không có quyền" });
 
-        var result = await _projectCodes.DeleteOneAsync(x => x.LegacyId == id);
+        var result = await _projectCodes.DeleteOneAsync(TenantContext.CompanyFilter<ProjectCode>(companyId) & Builders<ProjectCode>.Filter.Eq(x => x.LegacyId, id));
         if (result.DeletedCount == 0) return NotFound(new { message = "Không tìm thấy mã dự án" });
         return Ok(new { message = "Đã xóa" });
     }
 }
-

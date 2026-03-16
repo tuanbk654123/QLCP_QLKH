@@ -13,6 +13,7 @@ import Contracts from '../modules/contracts';
 import ExportWord from '../modules/export-word';
 import SchedulingPage from '../modules/scheduling';
 import AuditLogsPage from '../modules/audit-logs';
+import Companies from '../modules/companies';
 
 const AppRoutes = () => {
   return (
@@ -35,6 +36,14 @@ const AppRoutes = () => {
                   element={
                     <ProtectedRoute requirePermissionsAdmin={true}>
                       <PermissionModule />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/companies"
+                  element={
+                    <ProtectedRoute requirePermissionsAdmin={true}>
+                      <Companies />
                     </ProtectedRoute>
                   }
                 />

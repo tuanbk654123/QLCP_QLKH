@@ -9,6 +9,8 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [modulePermissions, setModulePermissions] = useState({});
+  const [companies, setCompanies] = useState([]);
+  const [activeCompanyId, setActiveCompanyId] = useState(null);
 
   const setAuthToken = (token) => {
     if (token) {
@@ -42,6 +44,17 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const loadCompanies = async () => {
+    try {
+      const res = await axios.get('/api/auth/companies');
+      setCompanies(res.data.items || []);
+      setActiveCompanyId(res.data.activeCompanyId || null);
+    } catch (error) {
+      setCompanies([]);
+      setActiveCompanyId(null);
+    }
+  };
+
   const checkAuth = async () => {
     setLoading(true);
     try {
@@ -49,13 +62,18 @@ export const AuthProvider = ({ children }) => {
       if (response.data.user) {
         setUser(response.data.user);
         await loadModulePermissions();
+        await loadCompanies();
       } else {
         setUser(null);
         setModulePermissions({});
+        setCompanies([]);
+        setActiveCompanyId(null);
       }
     } catch (error) {
       setUser(null);
       setModulePermissions({});
+      setCompanies([]);
+      setActiveCompanyId(null);
     } finally {
       setLoading(false);
     }
@@ -79,6 +97,7 @@ export const AuthProvider = ({ children }) => {
         setAuthToken(token);
         setUser(userData);
         await loadModulePermissions();
+        await loadCompanies();
         return { success: true, user: userData };
       }
       return { success: false, message: 'Đăng nhập thất bại' };
@@ -86,6 +105,25 @@ export const AuthProvider = ({ children }) => {
       setAuthToken(null);
       console.error('Login error:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Đăng nhập thất bại';
+      return { success: false, message: errorMessage };
+    }
+  };
+
+  const switchCompany = async (companyId) => {
+    if (!companyId) return { success: false };
+    try {
+      const res = await axios.post('/api/auth/switch-company', { companyId });
+      const { token, user: userData } = res.data || {};
+      if (token && userData) {
+        setAuthToken(token);
+        setUser(userData);
+        setActiveCompanyId(companyId);
+        window.location.reload();
+        return { success: true };
+      }
+      return { success: false };
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || error.message || 'Chuyển công ty thất bại';
       return { success: false, message: errorMessage };
     }
   };
@@ -98,6 +136,8 @@ export const AuthProvider = ({ children }) => {
       setAuthToken(null);
       setUser(null);
       setModulePermissions({});
+      setCompanies([]);
+      setActiveCompanyId(null);
     }
     return { success: true };
   };
@@ -132,7 +172,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const canAccessPermissions = () => {
-    return user && (user.role === 'admin' || user.role === 'ceo');
+    return user && (user.role === 'admin' || user.role === 'ceo' || user.role === 'assistant_ceo');
   };
 
   const canAccessAuditLogs = () => {
@@ -149,8 +189,11 @@ export const AuthProvider = ({ children }) => {
         user,
         loading,
         modulePermissions,
+        companies,
+        activeCompanyId,
         login,
         logout,
+        switchCompany,
         isAdmin,
         isManager,
         getPermissionLevel,

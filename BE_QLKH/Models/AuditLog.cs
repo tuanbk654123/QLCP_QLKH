@@ -16,6 +16,10 @@ public class AuditLog
     [BsonElement("entity_legacy_id")]
     public int EntityLegacyId { get; set; }
 
+    [BsonElement("company_id")]
+    [BsonRepresentation(BsonType.ObjectId)]
+    public string CompanyId { get; set; } = string.Empty;
+
     [BsonElement("action")]
     public string Action { get; set; } = string.Empty;
 
@@ -43,4 +47,3 @@ public class AuditLog
     [BsonElement("changed_fields")]
     public List<string> ChangedFields { get; set; } = new();
 }
-

@@ -3,25 +3,23 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace BE_QLKH.Models;
 
-public class ProjectCode
+public class UserCompany
 {
     [BsonId]
     [BsonRepresentation(BsonType.ObjectId)]
     public string Id { get; set; } = string.Empty;
 
-    [BsonElement("legacy_id")]
-    public int LegacyId { get; set; }
+    [BsonElement("user_legacy_id")]
+    public int UserLegacyId { get; set; }
 
     [BsonElement("company_id")]
     [BsonRepresentation(BsonType.ObjectId)]
     public string CompanyId { get; set; } = string.Empty;
 
-    [BsonElement("code")]
-    public string Code { get; set; } = string.Empty;
+    [BsonElement("is_default")]
+    public bool IsDefault { get; set; }
 
     [BsonElement("created_at")]
-    public string? CreatedAt { get; set; }
-
-    [BsonElement("updated_at")]
-    public string? UpdatedAt { get; set; }
+    public string CreatedAt { get; set; } = string.Empty;
 }
+

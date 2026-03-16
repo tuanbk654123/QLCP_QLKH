@@ -22,6 +22,7 @@ public class CostsController : ControllerBase
     private readonly IMongoCollection<Cost> _costs;
     private readonly IMongoCollection<User> _users;
     private readonly IMongoCollection<Notification> _notifications;
+    private readonly IMongoCollection<UserCompany> _userCompanies;
     private readonly IHubContext<NotificationsHub> _hubContext;
     private readonly ILogger<CostsController> _logger;
     private readonly IEmailService _emailService;
@@ -39,6 +40,7 @@ public class CostsController : ControllerBase
         _costs = db.GetCollection<Cost>("costs");
         _users = db.GetCollection<User>("users");
         _notifications = db.GetCollection<Notification>("notifications");
+        _userCompanies = db.GetCollection<UserCompany>("user_companies");
         _hubContext = hubContext;
         _logger = logger;
         _emailService = emailService;
@@ -56,8 +58,10 @@ public class CostsController : ControllerBase
         const int pageSize = 10;
         var skip = (page - 1) * pageSize;
 
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
+
         var builder = Builders<Cost>.Filter;
-        var filter = builder.Empty;
+        var filter = TenantContext.CompanyFilter<Cost>(companyId);
 
         // Role-Based Access Control (RBAC) for Visibility
         var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
@@ -197,8 +201,20 @@ public class CostsController : ControllerBase
     [HttpGet("{id:int}")]
     public async Task<ActionResult<object>> GetCostByLegacyId(int id)
     {
-        var cost = await _costs.Find(c => c.LegacyId == id).FirstOrDefaultAsync();
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
+        var cost = await _costs.Find(TenantContext.CompanyFilter<Cost>(companyId) & Builders<Cost>.Filter.Eq(c => c.LegacyId, id)).FirstOrDefaultAsync();
         if (cost == null) return NotFound(new { message = "Cost not found" });
+
+        var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
+        var legacyIdStr = User.FindFirst("legacy_id")?.Value;
+        if (int.TryParse(legacyIdStr, out var currentUserId))
+        {
+            var viewAllRoles = new[] { "admin", "director", "giam_doc", "manager", "ip_manager", "quan_ly", "accountant", "ke_toan", "marketing_sales", "sales" };
+            if (!viewAllRoles.Contains(userRole) && cost.CreatedByUserId != currentUserId)
+            {
+                return StatusCode(403, new { message = "Bạn không có quyền xem phiếu này" });
+            }
+        }
 
         return Ok(new
         {
@@ -234,6 +250,7 @@ public class CostsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<object>> CreateCost([FromBody] Cost input)
     {
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
         var userIdStr = User.FindFirst("legacy_id")?.Value;
         if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
         var userName = User.Identity?.Name ?? "Unknown";
@@ -241,6 +258,7 @@ public class CostsController : ControllerBase
         try
         {
             input.Id = ObjectId.GenerateNewId().ToString();
+            input.CompanyId = companyId;
 
             Cost? maxLegacyId = null;
             for (var attempt = 0; attempt < 3; attempt++)
@@ -377,12 +395,13 @@ public class CostsController : ControllerBase
     [HttpPut("{id:int}")]
     public async Task<ActionResult<object>> UpdateCost(int id, [FromBody] Cost input)
     {
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
         var userIdStr = User.FindFirst("legacy_id")?.Value;
         if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
         var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
         var userName = User.Identity?.Name ?? "Unknown";
 
-        var cost = await _costs.Find(c => c.LegacyId == id).FirstOrDefaultAsync();
+        var cost = await _costs.Find(TenantContext.CompanyFilter<Cost>(companyId) & Builders<Cost>.Filter.Eq(c => c.LegacyId, id)).FirstOrDefaultAsync();
         if (cost == null) return NotFound(new { message = "Cost not found" });
         var before = JsonSerializer.Deserialize<Cost>(JsonSerializer.Serialize(cost)) ?? cost;
 
@@ -440,6 +459,7 @@ public class CostsController : ControllerBase
 
         input.Id = cost.Id;
         input.LegacyId = cost.LegacyId;
+        input.CompanyId = cost.CompanyId;
         input.CreatedByUserId = cost.CreatedByUserId;
         input.StatusHistory = cost.StatusHistory;
         
@@ -452,7 +472,7 @@ public class CostsController : ControllerBase
         
         // Allow PaymentStatus, RejectionReason, Approver* fields to be updated from input
 
-        await _costs.ReplaceOneAsync(c => c.Id == cost.Id, input);
+        await _costs.ReplaceOneAsync(TenantContext.CompanyFilter<Cost>(companyId) & Builders<Cost>.Filter.Eq(c => c.Id, cost.Id), input);
         try
         {
             var actor = await _users.Find(u => u.LegacyId == userId).FirstOrDefaultAsync();
@@ -468,11 +488,12 @@ public class CostsController : ControllerBase
     [HttpDelete("{id:int}")]
     public async Task<ActionResult<object>> DeleteCost(int id)
     {
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
         var userIdStr = User.FindFirst("legacy_id")?.Value;
         if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
         var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
 
-        var cost = await _costs.Find(c => c.LegacyId == id).FirstOrDefaultAsync();
+        var cost = await _costs.Find(TenantContext.CompanyFilter<Cost>(companyId) & Builders<Cost>.Filter.Eq(c => c.LegacyId, id)).FirstOrDefaultAsync();
         if (cost == null) return NotFound(new { message = "Cost not found" });
         var before = JsonSerializer.Deserialize<Cost>(JsonSerializer.Serialize(cost)) ?? cost;
 
@@ -488,7 +509,7 @@ public class CostsController : ControllerBase
              return StatusCode(403, new { message = "Bạn không có quyền xóa phiếu này (chỉ xóa được phiếu nháp hoặc phiếu đã bị hủy)" });
         }
 
-        var result = await _costs.DeleteOneAsync(c => c.LegacyId == id);
+        var result = await _costs.DeleteOneAsync(TenantContext.CompanyFilter<Cost>(companyId) & Builders<Cost>.Filter.Eq(c => c.LegacyId, id));
         if (result.DeletedCount > 0)
         {
             try
@@ -506,6 +527,7 @@ public class CostsController : ControllerBase
     [HttpPost("{id:int}/approve")]
     public async Task<ActionResult<object>> ApproveCost(int id, [FromBody] JsonElement body)
     {
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
         var userIdStr = User.FindFirst("legacy_id")?.Value;
         if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
         var userRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
@@ -523,7 +545,7 @@ public class CostsController : ControllerBase
             }
         }
 
-        var cost = await _costs.Find(c => c.LegacyId == id).FirstOrDefaultAsync();
+        var cost = await _costs.Find(TenantContext.CompanyFilter<Cost>(companyId) & Builders<Cost>.Filter.Eq(c => c.LegacyId, id)).FirstOrDefaultAsync();
         if (cost == null) return NotFound(new { message = "Cost not found" });
         var before = JsonSerializer.Deserialize<Cost>(JsonSerializer.Serialize(cost)) ?? cost;
 
@@ -629,7 +651,7 @@ public class CostsController : ControllerBase
             Note = $"Được duyệt bởi {userName}"
         });
 
-        await _costs.ReplaceOneAsync(c => c.Id == cost.Id, cost);
+        await _costs.ReplaceOneAsync(TenantContext.CompanyFilter<Cost>(companyId) & Builders<Cost>.Filter.Eq(c => c.Id, cost.Id), cost);
         try
         {
             var actor = await _users.Find(u => u.LegacyId == userId).FirstOrDefaultAsync();
@@ -689,6 +711,7 @@ public class CostsController : ControllerBase
     [HttpPost("{id:int}/reject")]
     public async Task<ActionResult<object>> RejectCost(int id, [FromBody] JsonElement body)
     {
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
         var userIdStr = User.FindFirst("legacy_id")?.Value;
         if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
         var userName = User.Identity?.Name ?? "Unknown";
@@ -699,7 +722,7 @@ public class CostsController : ControllerBase
             reason = reasonProp.GetString() ?? "";
         }
 
-        var cost = await _costs.Find(c => c.LegacyId == id).FirstOrDefaultAsync();
+        var cost = await _costs.Find(TenantContext.CompanyFilter<Cost>(companyId) & Builders<Cost>.Filter.Eq(c => c.LegacyId, id)).FirstOrDefaultAsync();
         if (cost == null) return NotFound(new { message = "Cost not found" });
         var before = JsonSerializer.Deserialize<Cost>(JsonSerializer.Serialize(cost)) ?? cost;
 
@@ -713,7 +736,7 @@ public class CostsController : ControllerBase
             Note = $"Từ chối: {reason}"
         });
 
-        await _costs.ReplaceOneAsync(c => c.Id == cost.Id, cost);
+        await _costs.ReplaceOneAsync(TenantContext.CompanyFilter<Cost>(companyId) & Builders<Cost>.Filter.Eq(c => c.Id, cost.Id), cost);
         try
         {
             var actor = await _users.Find(u => u.LegacyId == userId).FirstOrDefaultAsync();
@@ -736,7 +759,13 @@ public class CostsController : ControllerBase
 
     private async Task SendNotificationToRole(string roleCode, string title, string message, string type, string relatedId, HashSet<int>? notifiedUserIds = null)
     {
-        var users = await _users.Find(u => u.RoleCode == roleCode).ToListAsync();
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
+        var userLegacyIds = await _userCompanies.Find(TenantContext.CompanyFilter<UserCompany>(companyId))
+            .Project(x => x.UserLegacyId)
+            .ToListAsync();
+        var users = userLegacyIds.Count == 0
+            ? new List<User>()
+            : await _users.Find(u => u.RoleCode == roleCode && userLegacyIds.Contains(u.LegacyId)).ToListAsync();
         foreach (var user in users)
         {
             if (notifiedUserIds != null)
@@ -751,10 +780,12 @@ public class CostsController : ControllerBase
     
     private async Task CreateAndSendNotification(int userId, string title, string message, string type, string relatedId)
     {
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
         var notif = new Notification
         {
             Id = ObjectId.GenerateNewId().ToString(),
             UserId = userId,
+            CompanyId = companyId,
             Title = title,
             Message = message,
             Type = type,
@@ -790,7 +821,7 @@ public class CostsController : ControllerBase
                     Cost? relatedCost = null;
                     if (int.TryParse(relatedId, out int costLegacyId))
                     {
-                        relatedCost = await _costs.Find(c => c.LegacyId == costLegacyId).FirstOrDefaultAsync();
+                        relatedCost = await _costs.Find(TenantContext.CompanyFilter<Cost>(companyId) & Builders<Cost>.Filter.Eq(c => c.LegacyId, costLegacyId)).FirstOrDefaultAsync();
                     }
                     else
                     {

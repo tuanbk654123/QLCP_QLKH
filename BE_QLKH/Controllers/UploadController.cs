@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using BE_QLKH.Services;
 
 namespace BE_QLKH.Controllers;
 
@@ -8,39 +9,28 @@ namespace BE_QLKH.Controllers;
 [Authorize]
 public class UploadController : ControllerBase
 {
-    private readonly IWebHostEnvironment _environment;
+    private readonly IFileStorage _fileStorage;
 
-    public UploadController(IWebHostEnvironment environment)
+    public UploadController(IFileStorage fileStorage)
     {
-        _environment = environment;
+        _fileStorage = fileStorage;
     }
 
     [HttpPost]
-    public async Task<ActionResult<object>> Upload(IFormFile file)
+    public async Task<ActionResult<object>> Upload(IFormFile file, [FromQuery] string? module)
     {
         if (file == null || file.Length == 0)
             return BadRequest(new { message = "No file uploaded" });
 
-        // Ensure uploads folder exists
-        var webRootPath = _environment.WebRootPath ?? Path.Combine(_environment.ContentRootPath, "wwwroot");
-        var uploadsFolder = Path.Combine(webRootPath, "uploads");
-        if (!Directory.Exists(uploadsFolder))
-        {
-            Directory.CreateDirectory(uploadsFolder);
-        }
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
 
-        // Generate unique filename
-        var fileName = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
-        var filePath = Path.Combine(uploadsFolder, fileName);
+        var prefix = "uploads";
+        var m = module?.Trim().ToLowerInvariant();
+        if (m == "qlcp" || m == "cost" || m == "costs") prefix = "costs";
+        if (m == "qlkh" || m == "customer" || m == "customers") prefix = "customers";
+        prefix = $"{prefix}/{companyId}";
 
-        using (var stream = new FileStream(filePath, FileMode.Create))
-        {
-            await file.CopyToAsync(stream);
-        }
-
-        // Return relative path
-        var relativePath = $"/uploads/{fileName}";
-        
-        return Ok(new { path = relativePath, originalName = file.FileName });
+        var stored = await _fileStorage.UploadAsync(file, prefix, HttpContext.RequestAborted);
+        return Ok(new { path = stored.Url, key = stored.Key, originalName = stored.OriginalName });
     }
 }

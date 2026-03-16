@@ -13,6 +13,10 @@ public class Cost
     [BsonElement("legacy_id")]
     public int LegacyId { get; set; }
 
+    [BsonElement("company_id")]
+    [BsonRepresentation(BsonType.ObjectId)]
+    public string CompanyId { get; set; } = string.Empty;
+
     [BsonElement("requester")]
     public string Requester { get; set; } = string.Empty;
 
