@@ -10,7 +10,6 @@ import {
   message,
   Popconfirm,
   Select,
-  DatePicker,
   Row,
   Col,
 } from 'antd';
@@ -21,42 +20,19 @@ import {
   SearchOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
-import dayjs from 'dayjs';
 import { useAuth } from '../../context/AuthContext';
 import { handleApiError } from '../../utils/errorHelper';
 import './index.css';
 
-const { Option } = Select;
+const ROLE_COLOR_PALETTE = ['blue', 'geekblue', 'purple', 'magenta', 'volcano', 'orange', 'gold', 'green', 'cyan', 'lime'];
+const SYSTEM_ROLE_COLORS = { admin: 'gold', ceo: 'volcano', assistant_ceo: 'volcano' };
 
-const ROLE_OPTIONS = [
-  { value: 'marketing_sales', label: 'Marketing/Kinh doanh' },
-  { value: 'ip_executive', label: 'Chuyên viên SHTT' },
-  { value: 'ip_manager', label: 'Trưởng phòng SHTT' },
-  { value: 'director', label: 'Giám đốc' },
-  { value: 'assistant_director', label: 'Trợ lý GĐ' },
-  { value: 'ceo', label: 'Tổng giám đốc' },
-  { value: 'assistant_ceo', label: 'Trợ lý TGĐ' },
-  { value: 'hr', label: 'Nhân sự' },
-  { value: 'accountant', label: 'Kế toán' },
-  { value: 'admin', label: 'Admin' },
-];
-
-const ROLE_LABELS = ROLE_OPTIONS.reduce((acc, r) => {
-  acc[r.value] = r.label;
-  return acc;
-}, {});
-
-const ROLE_COLORS = {
-  admin: 'gold',
-  marketing_sales: 'purple',
-  ip_executive: 'geekblue',
-  ip_manager: 'blue',
-  director: 'red',
-  assistant_director: 'red',
-  ceo: 'volcano',
-  assistant_ceo: 'volcano',
-  hr: 'cyan',
-  accountant: 'green',
+const hashCode = (str) => {
+  let h = 0;
+  for (let i = 0; i < (str || '').length; i += 1) {
+    h = (h * 31 + str.charCodeAt(i)) >>> 0;
+  }
+  return h;
 };
 
 const Users = () => {
@@ -66,6 +42,9 @@ const Users = () => {
   const [search, setSearch] = useState('');
   const [companyOptions, setCompanyOptions] = useState([]);
   const [companyOptionsLoading, setCompanyOptionsLoading] = useState(false);
+  const [roleOptions, setRoleOptions] = useState([]);
+  const [roleNameMap, setRoleNameMap] = useState({});
+  const [roleOptionsLoading, setRoleOptionsLoading] = useState(false);
   
   const [tableParams, setTableParams] = useState({
     pagination: {
@@ -110,6 +89,25 @@ const Users = () => {
     }
   }, []);
 
+  const fetchRoleOptions = useCallback(async () => {
+    setRoleOptionsLoading(true);
+    try {
+      const res = await axios.get('/api/roles');
+      const items = res.data.items || [];
+      setRoleOptions(items.map((r) => ({ value: r.code, label: r.name })));
+      const map = {};
+      items.forEach((r) => {
+        map[r.code] = r.name;
+      });
+      setRoleNameMap(map);
+    } catch {
+      setRoleOptions([]);
+      setRoleNameMap({});
+    } finally {
+      setRoleOptionsLoading(false);
+    }
+  }, []);
+
   const fetchUsers = useCallback(async () => {
     const level = fieldPermissions.list;
     if (!level && !isAdmin()) return;
@@ -146,6 +144,10 @@ const Users = () => {
   useEffect(() => {
     fetchPermissions();
   }, [fetchPermissions]);
+
+  useEffect(() => {
+    fetchRoleOptions();
+  }, [fetchRoleOptions]);
 
   useEffect(() => {
     fetchUsers();
@@ -209,7 +211,7 @@ const Users = () => {
     setEditingUser(null);
     form.resetFields();
     form.setFieldsValue({
-      role: 'marketing_sales',
+      role: roleOptions[0]?.value,
       status: 'active',
     });
     fetchCompanyOptions();
@@ -278,11 +280,14 @@ const Users = () => {
   };
 
   const getRoleText = (role) => {
-    return ROLE_LABELS[role] || role;
+    return roleNameMap[role] || role;
   };
 
   const getRoleColor = (role) => {
-    return ROLE_COLORS[role] || 'default';
+    if (!role) return 'default';
+    if (SYSTEM_ROLE_COLORS[role]) return SYSTEM_ROLE_COLORS[role];
+    const idx = hashCode(role) % ROLE_COLOR_PALETTE.length;
+    return ROLE_COLOR_PALETTE[idx];
   };
 
   const formatCurrency = (amount) => {
@@ -400,7 +405,7 @@ const Users = () => {
       ...getColumnSearchProps('position'),
     },
     { 
-      title: 'Vai trò (Role)', 
+      title: 'Chức danh', 
       dataIndex: 'role', 
       key: 'role', 
       width: 160, 
@@ -818,16 +823,10 @@ const Users = () => {
             <Col span={12}>
               <Form.Item
                 name="role"
-                label="Vai trò"
-                rules={[{ required: true, message: 'Vui lòng chọn vai trò' }]}
+                label="Chức danh"
+                rules={[{ required: true, message: 'Vui lòng chọn chức danh' }]}
               >
-                <Select>
-                  {ROLE_OPTIONS.map((role) => (
-                    <Option key={role.value} value={role.value}>
-                      {role.label}
-                    </Option>
-                  ))}
-                </Select>
+                <Select loading={roleOptionsLoading} options={roleOptions} />
               </Form.Item>
             </Col>
           </Row>
@@ -881,24 +880,18 @@ const Users = () => {
                 <Input />
               </Form.Item>
             </Col>
-            <Col span={12}>
-              <Form.Item
-                name="position"
-                label="Chức danh"
-              >
-                <Input />
-              </Form.Item>
-            </Col>
           </Row>
 
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item name="status" label="Trạng thái">
-                <Select>
-                  <Option value="active">Hoạt động</Option>
-                  <Option value="locked">Khóa</Option>
-                  <Option value="inactive">Không hoạt động</Option>
-                </Select>
+                <Select
+                  options={[
+                    { value: 'active', label: 'Hoạt động' },
+                    { value: 'locked', label: 'Khóa' },
+                    { value: 'inactive', label: 'Không hoạt động' },
+                  ]}
+                />
               </Form.Item>
             </Col>
           </Row>

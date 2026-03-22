@@ -20,6 +20,7 @@ public class UsersController : ControllerBase
     private readonly IMongoCollection<User> _users;
     private readonly IMongoCollection<Company> _companies;
     private readonly IMongoCollection<UserCompany> _userCompanies;
+    private readonly IMongoCollection<Role> _roles;
 
     public UsersController(IMongoClient client, IOptions<MongoDbSettings> options)
     {
@@ -27,6 +28,7 @@ public class UsersController : ControllerBase
         _users = db.GetCollection<User>("users");
         _companies = db.GetCollection<Company>("companies");
         _userCompanies = db.GetCollection<UserCompany>("user_companies");
+        _roles = db.GetCollection<Role>("roles");
     }
 
     private static string GetRole(ClaimsPrincipal user) => user.FindFirst(ClaimTypes.Role)?.Value ?? string.Empty;
@@ -317,6 +319,20 @@ public class UsersController : ControllerBase
         input.CreatedAt = string.IsNullOrEmpty(input.CreatedAt) ? now : input.CreatedAt;
         input.UpdatedAt = input.CreatedAt;
 
+        if (string.IsNullOrWhiteSpace(input.RoleCode))
+        {
+            return BadRequest(new { message = "Thiếu chức danh" });
+        }
+
+        var roleCode = input.RoleCode.Trim().ToLowerInvariant();
+        var roleExists = await _roles.Find(r => r.Code == roleCode && r.IsActive).AnyAsync();
+        if (!roleExists)
+        {
+            return BadRequest(new { message = "Chức danh không tồn tại hoặc đã bị tắt" });
+        }
+
+        input.RoleCode = roleCode;
+
         if (string.IsNullOrWhiteSpace(input.PasswordHash))
         {
             var pwd = string.IsNullOrWhiteSpace(input.Password) ? "123456" : input.Password;
@@ -425,6 +441,20 @@ public class UsersController : ControllerBase
         input.CompanyId = string.IsNullOrWhiteSpace(input.CompanyId) ? user.CompanyId : input.CompanyId;
         input.Company = string.IsNullOrWhiteSpace(input.Company) ? user.Company : input.Company;
         input.UpdatedAt = DateTime.UtcNow.ToString("yyyy-MM-dd");
+
+        if (string.IsNullOrWhiteSpace(input.RoleCode))
+        {
+            return BadRequest(new { message = "Thiếu chức danh" });
+        }
+
+        var roleCode = input.RoleCode.Trim().ToLowerInvariant();
+        var roleExists = await _roles.Find(r => r.Code == roleCode && r.IsActive).AnyAsync();
+        if (!roleExists)
+        {
+            return BadRequest(new { message = "Chức danh không tồn tại hoặc đã bị tắt" });
+        }
+
+        input.RoleCode = roleCode;
 
         if (!string.IsNullOrEmpty(input.OffboardDate))
         {

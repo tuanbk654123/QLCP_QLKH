@@ -62,7 +62,10 @@ public class AuthController : ControllerBase
         Console.WriteLine($"Login successful for user: {request.Username}");
         var activeCompanyId = await ResolveActiveCompanyId(user);
         var roleForToken = await ResolveRoleForCompany(user, activeCompanyId);
-        var token = GenerateJwtToken(user, activeCompanyId, roleForToken);
+        var mappings = await _userCompanies.Find(x => x.UserLegacyId == user.LegacyId).ToListAsync();
+        var companyIds = mappings.Select(x => x.CompanyId).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
+        var companyScope = companyIds.Count > 1 ? BE_QLKH.Services.TenantContext.AllCompaniesScope : "single";
+        var token = GenerateJwtToken(user, activeCompanyId, roleForToken, companyIds, companyScope);
 
         return Ok(new
         {
@@ -146,10 +149,12 @@ public class AuthController : ControllerBase
             : await _companies.Find(c => companyIds.Contains(c.Id) && c.Status == "active").ToListAsync();
 
         var activeCompanyId = BE_QLKH.Services.TenantContext.GetCompanyId(User);
+        var activeScope = BE_QLKH.Services.TenantContext.GetCompanyScope(User);
 
         return Ok(new
         {
             activeCompanyId,
+            activeScope,
             items = companies.Select(c => new { id = c.Id, code = c.Code, name = c.Name }).OrderBy(x => x.code).ToList()
         });
     }
@@ -174,14 +179,24 @@ public class AuthController : ControllerBase
             return BadRequest(new { message = "Thiếu companyId" });
         }
 
-        var ok = await _userCompanies.Find(x => x.UserLegacyId == legacyId && x.CompanyId == request.CompanyId).AnyAsync();
-        if (!ok) return StatusCode(403, new { message = "Bạn không có quyền truy cập công ty này" });
-
         var user = await _users.Find(u => u.LegacyId == legacyId).FirstOrDefaultAsync();
         if (user == null) return Unauthorized();
 
-        var roleForToken = await ResolveRoleForCompany(user, request.CompanyId);
-        var token = GenerateJwtToken(user, request.CompanyId, roleForToken);
+        var mappings = await _userCompanies.Find(x => x.UserLegacyId == legacyId).ToListAsync();
+        var companyIds = mappings.Select(x => x.CompanyId).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
+        if (companyIds.Count == 0) return StatusCode(403, new { message = "Bạn chưa được gán công ty" });
+
+        var isAll = string.Equals(request.CompanyId, "__ALL__", StringComparison.OrdinalIgnoreCase);
+        if (!isAll)
+        {
+            var ok = companyIds.Contains(request.CompanyId);
+            if (!ok) return StatusCode(403, new { message = "Bạn không có quyền truy cập công ty này" });
+        }
+
+        var targetCompanyId = isAll ? await ResolveActiveCompanyId(user) : request.CompanyId;
+        var roleForToken = await ResolveRoleForCompany(user, targetCompanyId);
+        var companyScope = isAll && companyIds.Count > 1 ? BE_QLKH.Services.TenantContext.AllCompaniesScope : "single";
+        var token = GenerateJwtToken(user, targetCompanyId, roleForToken, companyIds, companyScope);
         return Ok(new
         {
             token,
@@ -198,7 +213,8 @@ public class AuthController : ControllerBase
                 department = user.Department,
                 position = user.Position,
                 joinDate = user.JoinDate,
-                companyId = request.CompanyId
+                companyId = targetCompanyId,
+                companyScope
             }
         });
     }
@@ -235,7 +251,7 @@ public class AuthController : ControllerBase
         return false;
     }
 
-    private string GenerateJwtToken(User user, string companyId, string roleCode)
+    private string GenerateJwtToken(User user, string companyId, string roleCode, List<string> companyIds, string companyScope)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_authSettings.Key));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -245,6 +261,8 @@ public class AuthController : ControllerBase
             new Claim(JwtRegisteredClaimNames.Sub, user.Username),
             new Claim("legacy_id", user.LegacyId.ToString()),
             new Claim("company_id", companyId),
+            new Claim("company_scope", string.IsNullOrWhiteSpace(companyScope) ? "single" : companyScope),
+            new Claim("company_ids", string.Join(",", (companyIds ?? new List<string>()).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct())),
             new Claim(ClaimTypes.Name, user.FullName),
             new Claim(ClaimTypes.NameIdentifier, user.Id),
             new Claim(ClaimTypes.Role, roleCode)

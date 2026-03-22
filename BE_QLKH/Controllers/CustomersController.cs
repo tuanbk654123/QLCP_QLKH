@@ -59,7 +59,7 @@ public class CustomersController : ControllerBase
         var companyId = TenantContext.GetCompanyIdOrThrow(User);
 
         var builder = Builders<Customer>.Filter;
-        var filter = TenantContext.CompanyFilter<Customer>(companyId);
+        var filter = TenantContext.ScopeFilter<Customer>(User);
 
         // 1. Global Search
         if (!string.IsNullOrWhiteSpace(search))
@@ -252,7 +252,7 @@ public class CustomersController : ControllerBase
     public async Task<ActionResult<object>> GetCustomerByLegacyId(int id)
     {
         var companyId = TenantContext.GetCompanyIdOrThrow(User);
-        var filter = TenantContext.CompanyFilter<Customer>(companyId) & Builders<Customer>.Filter.Eq(c => c.LegacyId, id);
+        var filter = TenantContext.ScopeFilter<Customer>(User) & Builders<Customer>.Filter.Eq(c => c.LegacyId, id);
 
         var customer = await _customers.Find(filter).FirstOrDefaultAsync();
         if (customer == null) return NotFound(new { message = "Customer not found" });
@@ -448,7 +448,7 @@ public class CustomersController : ControllerBase
     public async Task<ActionResult<object>> UpdateCustomer(int id, [FromBody] Customer input)
     {
         var companyId = TenantContext.GetCompanyIdOrThrow(User);
-        var filter = TenantContext.CompanyFilter<Customer>(companyId) & Builders<Customer>.Filter.Eq(c => c.LegacyId, id);
+        var filter = TenantContext.ScopeFilter<Customer>(User) & Builders<Customer>.Filter.Eq(c => c.LegacyId, id);
 
         var customer = await _customers.Find(filter).FirstOrDefaultAsync();
         if (customer == null) return NotFound(new { message = "Customer not found" });
@@ -610,7 +610,7 @@ public class CustomersController : ControllerBase
     public async Task<ActionResult<object>> DeleteCustomer(int id)
     {
         var companyId = TenantContext.GetCompanyIdOrThrow(User);
-        var filter = TenantContext.CompanyFilter<Customer>(companyId) & Builders<Customer>.Filter.Eq(c => c.LegacyId, id);
+        var filter = TenantContext.ScopeFilter<Customer>(User) & Builders<Customer>.Filter.Eq(c => c.LegacyId, id);
 
         var customer = await _customers.Find(filter).FirstOrDefaultAsync();
         if (customer == null) return NotFound(new { message = "Customer not found" });

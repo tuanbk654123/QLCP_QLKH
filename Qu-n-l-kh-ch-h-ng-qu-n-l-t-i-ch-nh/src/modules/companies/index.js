@@ -137,7 +137,7 @@ const Companies = () => {
       >
         <Form form={form} layout="vertical">
           <Form.Item name="code" label="Mã" rules={[{ required: true, message: 'Vui lòng nhập mã' }]}>
-            <Input disabled={!!editing} />
+            <Input />
           </Form.Item>
           <Form.Item name="name" label="Tên công ty" rules={[{ required: true, message: 'Vui lòng nhập tên công ty' }]}>
             <Input />
@@ -160,4 +160,3 @@ const Companies = () => {
 };
 
 export default Companies;
-

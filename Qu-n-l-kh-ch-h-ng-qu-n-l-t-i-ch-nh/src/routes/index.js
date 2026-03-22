@@ -17,6 +17,7 @@ import Companies from '../modules/companies';
 import Projects from '../modules/projects';
 import ProjectDetail from '../modules/projects/ProjectDetail';
 import WorkDashboard from '../modules/work-dashboard';
+import Roles from '../modules/roles';
 
 const AppRoutes = () => {
   return (
@@ -43,6 +44,14 @@ const AppRoutes = () => {
                   element={
                     <ProtectedRoute requirePermissionsAdmin={true}>
                       <PermissionModule />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/roles"
+                  element={
+                    <ProtectedRoute requirePermissionsAdmin={true}>
+                      <Roles />
                     </ProtectedRoute>
                   }
                 />

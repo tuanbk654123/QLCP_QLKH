@@ -18,6 +18,9 @@ public class Role
     [BsonElement("description")]
     public string? Description { get; set; }
 
+    [BsonElement("is_system")]
+    public bool IsSystem { get; set; }
+
     [BsonElement("is_active")]
     public bool IsActive { get; set; } = true;
 }

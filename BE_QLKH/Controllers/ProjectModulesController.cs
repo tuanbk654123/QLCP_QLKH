@@ -53,10 +53,10 @@ public class ProjectModulesController : ControllerBase
     {
         var companyId = TenantContext.GetCompanyIdOrThrow(User);
 
-        var project = await _projects.Find(TenantContext.CompanyFilter<Project>(companyId) & Builders<Project>.Filter.Eq(p => p.LegacyId, projectId)).FirstOrDefaultAsync();
+        var project = await _projects.Find(TenantContext.ScopeFilter<Project>(User) & Builders<Project>.Filter.Eq(p => p.LegacyId, projectId)).FirstOrDefaultAsync();
         if (project == null) return NotFound(new { message = "Project not found" });
 
-        var filter = TenantContext.CompanyFilter<ProjectModule>(companyId) & Builders<ProjectModule>.Filter.Eq(m => m.ProjectId, project.Id);
+        var filter = TenantContext.ScopeFilter<ProjectModule>(User) & Builders<ProjectModule>.Filter.Eq(m => m.ProjectId, project.Id);
         var items = await _modules.Find(filter).SortBy(m => m.LegacyId).ToListAsync();
 
         return Ok(new

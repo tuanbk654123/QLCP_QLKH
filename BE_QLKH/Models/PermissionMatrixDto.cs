@@ -3,6 +3,8 @@ namespace BE_QLKH.Models;
 public class PermissionMatrixDto
 {
     public List<RoleDto> Roles { get; set; } = new();
+    public Dictionary<string, Dictionary<string, string>> PermissionsPermissions { get; set; } = new();
+    public Dictionary<string, Dictionary<string, string>> RolesPermissions { get; set; } = new();
     public Dictionary<string, Dictionary<string, string>> QlkhPermissions { get; set; } = new();
     public Dictionary<string, Dictionary<string, string>> QlcpPermissions { get; set; } = new();
     public Dictionary<string, Dictionary<string, string>> UserPermissions { get; set; } = new();
@@ -13,6 +15,8 @@ public class PermissionMatrixDto
     public Dictionary<string, Dictionary<string, string>> AuditPermissions { get; set; } = new();
     public Dictionary<string, Dictionary<string, string>> CompanyPermissions { get; set; } = new();
     public Dictionary<string, Dictionary<string, string>> ProjectPermissions { get; set; } = new();
+    public List<PermissionFieldGroupDto> PermissionsFields { get; set; } = new();
+    public List<PermissionFieldGroupDto> RolesFields { get; set; } = new();
     public List<PermissionFieldGroupDto> QlkhFields { get; set; } = new();
     public List<PermissionFieldGroupDto> QlcpFields { get; set; } = new();
     public List<PermissionFieldGroupDto> UserFields { get; set; } = new();

@@ -63,11 +63,11 @@ public class ProjectsController : ControllerBase
         var actorId = GetActorLegacyId();
 
         var builder = Builders<Project>.Filter;
-        var filter = TenantContext.CompanyFilter<Project>(companyId);
+        var filter = TenantContext.ScopeFilter<Project>(User);
 
         if (!CanViewAllInCompany(role))
         {
-            var taskFilter = TenantContext.CompanyFilter<ProjectTask>(companyId) & Builders<ProjectTask>.Filter.Eq(t => t.AssigneeUserId, actorId);
+            var taskFilter = TenantContext.ScopeFilter<ProjectTask>(User) & Builders<ProjectTask>.Filter.Eq(t => t.AssigneeUserId, actorId);
             var projectIds = await _tasks.Distinct<string>("project_id", taskFilter).ToListAsync();
             if (projectIds.Count == 0)
             {
@@ -130,13 +130,13 @@ public class ProjectsController : ControllerBase
         var role = GetRole(User);
         var actorId = GetActorLegacyId();
 
-        var filter = TenantContext.CompanyFilter<Project>(companyId) & Builders<Project>.Filter.Eq(p => p.LegacyId, id);
+        var filter = TenantContext.ScopeFilter<Project>(User) & Builders<Project>.Filter.Eq(p => p.LegacyId, id);
         var project = await _projects.Find(filter).FirstOrDefaultAsync();
         if (project == null) return NotFound(new { message = "Project not found" });
 
         if (!CanViewAllInCompany(role))
         {
-            var taskFilter = TenantContext.CompanyFilter<ProjectTask>(companyId) &
+            var taskFilter = TenantContext.ScopeFilter<ProjectTask>(User) &
                              Builders<ProjectTask>.Filter.Eq(t => t.ProjectId, project.Id) &
                              Builders<ProjectTask>.Filter.Eq(t => t.AssigneeUserId, actorId);
             var hasAny = await _tasks.Find(taskFilter).AnyAsync();

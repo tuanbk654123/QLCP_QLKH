@@ -6,6 +6,8 @@ namespace BE_QLKH.Services;
 
 public static class TenantContext
 {
+    public const string AllCompaniesScope = "all";
+
     public static string? GetRoleCode(ClaimsPrincipal user)
     {
         return user.FindFirst(ClaimTypes.Role)?.Value;
@@ -26,6 +28,23 @@ public static class TenantContext
         return companyId;
     }
 
+    public static string GetCompanyScope(ClaimsPrincipal user)
+    {
+        var scope = user.FindFirst("company_scope")?.Value;
+        return string.IsNullOrWhiteSpace(scope) ? "single" : scope;
+    }
+
+    public static List<string> GetCompanyIds(ClaimsPrincipal user)
+    {
+        var raw = user.FindFirst("company_ids")?.Value;
+        if (string.IsNullOrWhiteSpace(raw)) return new List<string>();
+        return raw
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct()
+            .ToList();
+    }
+
     public static string GetCompanyIdOrThrow(ClaimsPrincipal user)
     {
         var companyId = GetCompanyId(user);
@@ -44,6 +63,22 @@ public static class TenantContext
         }
 
         return Builders<T>.Filter.Eq("company_id", companyId);
+    }
+
+    public static FilterDefinition<T> ScopeFilter<T>(ClaimsPrincipal user)
+    {
+        var scope = GetCompanyScope(user);
+        if (string.Equals(scope, AllCompaniesScope, StringComparison.OrdinalIgnoreCase))
+        {
+            var ids = GetCompanyIds(user);
+            if (ids.Count > 0)
+            {
+                return CompanyIdsFilter<T>(ids);
+            }
+        }
+
+        var companyId = GetCompanyIdOrThrow(user);
+        return CompanyFilter<T>(companyId);
     }
 
     public static FilterDefinition<T> CompanyIdsFilter<T>(IEnumerable<string> companyIds)

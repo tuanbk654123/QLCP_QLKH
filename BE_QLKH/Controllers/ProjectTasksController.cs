@@ -136,18 +136,18 @@ public class ProjectTasksController : ControllerBase
         var actorId = GetActorLegacyId();
 
         var builder = Builders<ProjectTask>.Filter;
-        var filter = TenantContext.CompanyFilter<ProjectTask>(companyId);
+        var filter = TenantContext.ScopeFilter<ProjectTask>(User);
 
         if (projectId.HasValue)
         {
-            var project = await _projects.Find(TenantContext.CompanyFilter<Project>(companyId) & Builders<Project>.Filter.Eq(p => p.LegacyId, projectId.Value)).FirstOrDefaultAsync();
+            var project = await _projects.Find(TenantContext.ScopeFilter<Project>(User) & Builders<Project>.Filter.Eq(p => p.LegacyId, projectId.Value)).FirstOrDefaultAsync();
             if (project == null) return NotFound(new { message = "Project not found" });
             filter &= builder.Eq(t => t.ProjectId, project.Id);
         }
 
         if (moduleId.HasValue)
         {
-            var module = await _modules.Find(TenantContext.CompanyFilter<ProjectModule>(companyId) & Builders<ProjectModule>.Filter.Eq(m => m.LegacyId, moduleId.Value)).FirstOrDefaultAsync();
+            var module = await _modules.Find(TenantContext.ScopeFilter<ProjectModule>(User) & Builders<ProjectModule>.Filter.Eq(m => m.LegacyId, moduleId.Value)).FirstOrDefaultAsync();
             if (module == null) return NotFound(new { message = "Module not found" });
             filter &= builder.Eq(t => t.ModuleId, module.Id);
         }
@@ -205,18 +205,18 @@ public class ProjectTasksController : ControllerBase
         var actorId = GetActorLegacyId();
 
         var builder = Builders<ProjectTask>.Filter;
-        var filter = TenantContext.CompanyFilter<ProjectTask>(companyId);
+        var filter = TenantContext.ScopeFilter<ProjectTask>(User);
 
         if (projectId.HasValue)
         {
-            var project = await _projects.Find(TenantContext.CompanyFilter<Project>(companyId) & Builders<Project>.Filter.Eq(p => p.LegacyId, projectId.Value)).FirstOrDefaultAsync();
+            var project = await _projects.Find(TenantContext.ScopeFilter<Project>(User) & Builders<Project>.Filter.Eq(p => p.LegacyId, projectId.Value)).FirstOrDefaultAsync();
             if (project == null) return NotFound(new { message = "Project not found" });
             filter &= builder.Eq(t => t.ProjectId, project.Id);
         }
 
         if (moduleId.HasValue)
         {
-            var module = await _modules.Find(TenantContext.CompanyFilter<ProjectModule>(companyId) & Builders<ProjectModule>.Filter.Eq(m => m.LegacyId, moduleId.Value)).FirstOrDefaultAsync();
+            var module = await _modules.Find(TenantContext.ScopeFilter<ProjectModule>(User) & Builders<ProjectModule>.Filter.Eq(m => m.LegacyId, moduleId.Value)).FirstOrDefaultAsync();
             if (module == null) return NotFound(new { message = "Module not found" });
             filter &= builder.Eq(t => t.ModuleId, module.Id);
         }
@@ -255,20 +255,20 @@ public class ProjectTasksController : ControllerBase
 
         var companyId = TenantContext.GetCompanyIdOrThrow(User);
 
-        var project = await _projects.Find(TenantContext.CompanyFilter<Project>(companyId) & Builders<Project>.Filter.Eq(p => p.LegacyId, projectId)).FirstOrDefaultAsync();
+        var project = await _projects.Find(TenantContext.ScopeFilter<Project>(User) & Builders<Project>.Filter.Eq(p => p.LegacyId, projectId)).FirstOrDefaultAsync();
         if (project == null) return NotFound(new { message = "Project not found" });
 
         string? moduleObjectId = null;
         if (moduleId.HasValue)
         {
-            var module = await _modules.Find(TenantContext.CompanyFilter<ProjectModule>(companyId) & Builders<ProjectModule>.Filter.Eq(m => m.LegacyId, moduleId.Value)).FirstOrDefaultAsync();
+            var module = await _modules.Find(TenantContext.ScopeFilter<ProjectModule>(User) & Builders<ProjectModule>.Filter.Eq(m => m.LegacyId, moduleId.Value)).FirstOrDefaultAsync();
             if (module == null) return NotFound(new { message = "Module not found" });
             if (module.ProjectId != project.Id) return BadRequest(new { message = "Module không thuộc dự án" });
             moduleObjectId = module.Id;
         }
 
         var builder = Builders<ProjectTask>.Filter;
-        var filter = TenantContext.CompanyFilter<ProjectTask>(companyId) & builder.Eq(t => t.ProjectId, project.Id);
+        var filter = TenantContext.ScopeFilter<ProjectTask>(User) & builder.Eq(t => t.ProjectId, project.Id);
         if (!string.IsNullOrWhiteSpace(moduleObjectId))
         {
             filter &= builder.Eq(t => t.ModuleId, moduleObjectId);
@@ -359,20 +359,20 @@ public class ProjectTasksController : ControllerBase
         if (pageSize > 200) pageSize = 200;
 
         var companyId = TenantContext.GetCompanyIdOrThrow(User);
-        var project = await _projects.Find(TenantContext.CompanyFilter<Project>(companyId) & Builders<Project>.Filter.Eq(p => p.LegacyId, projectId)).FirstOrDefaultAsync();
+        var project = await _projects.Find(TenantContext.ScopeFilter<Project>(User) & Builders<Project>.Filter.Eq(p => p.LegacyId, projectId)).FirstOrDefaultAsync();
         if (project == null) return NotFound(new { message = "Project not found" });
 
         string? moduleObjectId = null;
         if (moduleId.HasValue)
         {
-            var module = await _modules.Find(TenantContext.CompanyFilter<ProjectModule>(companyId) & Builders<ProjectModule>.Filter.Eq(m => m.LegacyId, moduleId.Value)).FirstOrDefaultAsync();
+            var module = await _modules.Find(TenantContext.ScopeFilter<ProjectModule>(User) & Builders<ProjectModule>.Filter.Eq(m => m.LegacyId, moduleId.Value)).FirstOrDefaultAsync();
             if (module == null) return NotFound(new { message = "Module not found" });
             if (module.ProjectId != project.Id) return BadRequest(new { message = "Module không thuộc dự án" });
             moduleObjectId = module.Id;
         }
 
         var builder = Builders<ProjectTask>.Filter;
-        var filter = TenantContext.CompanyFilter<ProjectTask>(companyId) & builder.Eq(t => t.ProjectId, project.Id);
+        var filter = TenantContext.ScopeFilter<ProjectTask>(User) & builder.Eq(t => t.ProjectId, project.Id);
 
         if (!string.IsNullOrWhiteSpace(moduleObjectId))
         {

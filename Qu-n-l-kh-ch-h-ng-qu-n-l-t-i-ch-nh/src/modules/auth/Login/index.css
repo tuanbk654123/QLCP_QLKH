@@ -54,7 +54,11 @@
 
 .login-left .ant-input {
   line-height: 44px;
-  background: #ffffff;
+  background: transparent;
+}
+
+.login-left .ant-input-affix-wrapper .ant-input {
+  background: transparent;
 }
 
 .login-left .ant-input-affix-wrapper:hover,

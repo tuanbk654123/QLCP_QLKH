@@ -261,59 +261,132 @@ public class DatabaseSeeder : IHostedService
 
         var now = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
 
-        var companiesCollection = db.GetCollection<Company>("companies");
-        if (await companiesCollection.CountDocumentsAsync(_ => true, cancellationToken: cancellationToken) == 0)
+        var envName = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? string.Empty;
+        var seedProfile = Environment.GetEnvironmentVariable("SEED_PROFILE") ?? string.Empty;
+        var isProdSeed = string.Equals(envName, "Production", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(seedProfile, "prod", StringComparison.OrdinalIgnoreCase);
+        var seedClean = string.Equals(Environment.GetEnvironmentVariable("SEED_CLEAN"), "true", StringComparison.OrdinalIgnoreCase);
+
+        async Task CleanForProd()
         {
-            var defaultCompanies = new List<Company>
+            var collectionsToClear = new[]
             {
-                new Company { Id = ObjectId.GenerateNewId().ToString(), Code = "SHTT", Name = "Sở hữu trí tuệ (SHTT)", Status = "active", CreatedAt = now, UpdatedAt = now, CreatedBy = 0, UpdatedBy = 0 },
-                new Company { Id = ObjectId.GenerateNewId().ToString(), Code = "CTYA", Name = "Công ty A", Status = "active", CreatedAt = now, UpdatedAt = now, CreatedBy = 0, UpdatedBy = 0 },
-                new Company { Id = ObjectId.GenerateNewId().ToString(), Code = "CTYB", Name = "Công ty B", Status = "active", CreatedAt = now, UpdatedAt = now, CreatedBy = 0, UpdatedBy = 0 },
-                new Company { Id = ObjectId.GenerateNewId().ToString(), Code = "CTYC", Name = "Công ty C", Status = "active", CreatedAt = now, UpdatedAt = now, CreatedBy = 0, UpdatedBy = 0 }
+                "customers",
+                "costs",
+                "businesses",
+                "contracts",
+                "projects",
+                "project_modules",
+                "project_tasks",
+                "project_task_activities",
+                "audit_logs",
+                "notifications",
+                "counters",
+                "user_companies",
+                "users",
+                "companies"
             };
 
-            await companiesCollection.InsertManyAsync(defaultCompanies, cancellationToken: cancellationToken);
-        }
-        else
-        {
-            var hasShtt = await companiesCollection.Find(c => c.Code == "SHTT").AnyAsync(cancellationToken);
-            if (!hasShtt)
+            foreach (var name in collectionsToClear)
             {
-                await companiesCollection.InsertOneAsync(new Company
+                await db.GetCollection<BsonDocument>(name).DeleteManyAsync(Builders<BsonDocument>.Filter.Empty, cancellationToken);
+            }
+        }
+
+        if (isProdSeed && seedClean)
+        {
+            await CleanForProd();
+        }
+
+        var companiesCollection = db.GetCollection<Company>("companies");
+        Company? defaultCompany;
+        if (isProdSeed)
+        {
+            var prodCompanyCode = (Environment.GetEnvironmentVariable("PROD_COMPANY_CODE") ?? "CTYA").Trim().ToUpperInvariant();
+            var prodCompanyName = (Environment.GetEnvironmentVariable("PROD_COMPANY_NAME") ?? "Công ty").Trim();
+
+            defaultCompany = await companiesCollection.Find(c => c.Code == prodCompanyCode).FirstOrDefaultAsync(cancellationToken);
+            if (defaultCompany == null)
+            {
+                defaultCompany = new Company
                 {
                     Id = ObjectId.GenerateNewId().ToString(),
-                    Code = "SHTT",
-                    Name = "Sở hữu trí tuệ (SHTT)",
+                    Code = prodCompanyCode,
+                    Name = prodCompanyName,
                     Status = "active",
                     CreatedAt = now,
                     UpdatedAt = now,
                     CreatedBy = 0,
                     UpdatedBy = 0
-                }, null, cancellationToken);
+                };
+                await companiesCollection.InsertOneAsync(defaultCompany, cancellationToken: cancellationToken);
             }
         }
+        else
+        {
+            if (await companiesCollection.CountDocumentsAsync(_ => true, cancellationToken: cancellationToken) == 0)
+            {
+                var defaultCompanies = new List<Company>
+                {
+                    new Company { Id = ObjectId.GenerateNewId().ToString(), Code = "SHTT", Name = "Sở hữu trí tuệ (SHTT)", Status = "active", CreatedAt = now, UpdatedAt = now, CreatedBy = 0, UpdatedBy = 0 },
+                    new Company { Id = ObjectId.GenerateNewId().ToString(), Code = "CTYA", Name = "Công ty A", Status = "active", CreatedAt = now, UpdatedAt = now, CreatedBy = 0, UpdatedBy = 0 },
+                    new Company { Id = ObjectId.GenerateNewId().ToString(), Code = "CTYB", Name = "Công ty B", Status = "active", CreatedAt = now, UpdatedAt = now, CreatedBy = 0, UpdatedBy = 0 },
+                    new Company { Id = ObjectId.GenerateNewId().ToString(), Code = "CTYC", Name = "Công ty C", Status = "active", CreatedAt = now, UpdatedAt = now, CreatedBy = 0, UpdatedBy = 0 }
+                };
 
-        var defaultCompany = await companiesCollection.Find(c => c.Code == "SHTT").FirstOrDefaultAsync(cancellationToken) ??
+                await companiesCollection.InsertManyAsync(defaultCompanies, cancellationToken: cancellationToken);
+            }
+            else
+            {
+                var hasShtt = await companiesCollection.Find(c => c.Code == "SHTT").AnyAsync(cancellationToken);
+                if (!hasShtt)
+                {
+                    await companiesCollection.InsertOneAsync(new Company
+                    {
+                        Id = ObjectId.GenerateNewId().ToString(),
+                        Code = "SHTT",
+                        Name = "Sở hữu trí tuệ (SHTT)",
+                        Status = "active",
+                        CreatedAt = now,
+                        UpdatedAt = now,
+                        CreatedBy = 0,
+                        UpdatedBy = 0
+                    }, null, cancellationToken);
+                }
+            }
+
+            defaultCompany = await companiesCollection.Find(c => c.Code == "SHTT").FirstOrDefaultAsync(cancellationToken) ??
                              await companiesCollection.Find(c => c.Code == "CTYA").FirstOrDefaultAsync(cancellationToken) ??
                              await companiesCollection.Find(_ => true).SortBy(c => c.Code).FirstOrDefaultAsync(cancellationToken);
+        }
 
         var defaultCompanyId = defaultCompany?.Id ?? string.Empty;
         var defaultCompanyName = defaultCompany?.Name ?? string.Empty;
 
         var usersCollection = db.GetCollection<User>("users");
-        if (await usersCollection.CountDocumentsAsync(_ => true, cancellationToken: cancellationToken) == 0)
+        if (isProdSeed)
         {
-            var defaultUsers = new List<User>
+            var adminUsername = (Environment.GetEnvironmentVariable("PROD_ADMIN_USERNAME") ?? "admin").Trim();
+            var adminPassword = Environment.GetEnvironmentVariable("PROD_ADMIN_PASSWORD") ?? "Admin@123456";
+            var adminFullName = (Environment.GetEnvironmentVariable("PROD_ADMIN_FULLNAME") ?? "Quản trị hệ thống").Trim();
+            var adminEmail = (Environment.GetEnvironmentVariable("PROD_ADMIN_EMAIL") ?? "admin@example.com").Trim();
+
+            var adminUser = await usersCollection.Find(u => u.Username == adminUsername).FirstOrDefaultAsync(cancellationToken);
+            if (adminUser == null)
             {
-                new User
+                var maxLegacyId = await usersCollection.Find(_ => true).SortByDescending(u => u.LegacyId).Limit(1).FirstOrDefaultAsync(cancellationToken);
+                var legacyId = maxLegacyId != null ? maxLegacyId.LegacyId + 1 : 1;
+                var userId = $"U{legacyId:000}";
+
+                adminUser = new User
                 {
                     Id = ObjectId.GenerateNewId().ToString(),
-                    LegacyId = 1,
-                    UserId = "U001",
-                    Username = "admin",
-                    FullName = "Quản trị hệ thống",
-                    Email = "admin@example.com",
-                    PasswordHash = HashPassword("123456"),
+                    LegacyId = legacyId,
+                    UserId = userId,
+                    Username = adminUsername,
+                    FullName = adminFullName,
+                    Email = adminEmail,
+                    PasswordHash = HashPassword(adminPassword),
                     RoleCode = "admin",
                     Company = defaultCompanyName,
                     CompanyId = defaultCompanyId,
@@ -322,122 +395,162 @@ public class DatabaseSeeder : IHostedService
                     UpdatedAt = now,
                     CreatedBy = 0,
                     UpdatedBy = 0
-                },
-                new User
-                {
-                    Id = ObjectId.GenerateNewId().ToString(),
-                    LegacyId = 2,
-                    UserId = "U002",
-                    Username = "ceo",
-                    FullName = "Tổng giám đốc",
-                    Email = "ceo@example.com",
-                    PasswordHash = HashPassword("123456"),
-                    RoleCode = "ceo",
-                    Company = defaultCompanyName,
-                    CompanyId = defaultCompanyId,
-                    Status = "active",
-                    CreatedAt = now,
-                    UpdatedAt = now,
-                    CreatedBy = 0,
-                    UpdatedBy = 0
-                },
-                new User
-                {
-                    Id = ObjectId.GenerateNewId().ToString(),
-                    LegacyId = 3,
-                    UserId = "U003",
-                    Username = "director",
-                    FullName = "Giám đốc",
-                    Email = "director@example.com",
-                    PasswordHash = HashPassword("123456"),
-                    RoleCode = "director",
-                    Company = defaultCompanyName,
-                    CompanyId = defaultCompanyId,
-                    Status = "active",
-                    CreatedAt = now,
-                    UpdatedAt = now,
-                    CreatedBy = 0,
-                    UpdatedBy = 0
-                },
-                new User
-                {
-                    Id = ObjectId.GenerateNewId().ToString(),
-                    LegacyId = 4,
-                    UserId = "U004",
-                    Username = "accountant",
-                    FullName = "Kế toán",
-                    Email = "accountant@example.com",
-                    PasswordHash = HashPassword("123456"),
-                    RoleCode = "accountant",
-                    Company = defaultCompanyName,
-                    CompanyId = defaultCompanyId,
-                    Status = "active",
-                    CreatedAt = now,
-                    UpdatedAt = now,
-                    CreatedBy = 0,
-                    UpdatedBy = 0
-                },
-                new User
-                {
-                    Id = ObjectId.GenerateNewId().ToString(),
-                    LegacyId = 5,
-                    UserId = "U005",
-                    Username = "sales",
-                    FullName = "Marketing/Sales",
-                    Email = "sales@example.com",
-                    PasswordHash = HashPassword("123456"),
-                    RoleCode = "marketing_sales",
-                    Status = "active",
-                    CreatedAt = now,
-                    UpdatedAt = now,
-                    CreatedBy = 0,
-                    UpdatedBy = 0
-                },
-                new User
-                {
-                    Id = ObjectId.GenerateNewId().ToString(),
-                    LegacyId = 6,
-                    UserId = "U006",
-                    Username = "manager",
-                    FullName = "Quản lý IP",
-                    Email = "tuanvb96@gmail.com",
-                    PasswordHash = HashPassword("123456"),
-                    RoleCode = "ip_manager",
-                    Status = "active",
-                    CreatedAt = now,
-                    UpdatedAt = now,
-                    CreatedBy = 0,
-                    UpdatedBy = 0
-                },
-                new User
-                {
-                    Id = ObjectId.GenerateNewId().ToString(),
-                    LegacyId = 7,
-                    UserId = "U007",
-                    Username = "executive",
-                    FullName = "Chuyên viên IP",
-                    Email = "executive@example.com",
-                    PasswordHash = HashPassword("123456"),
-                    RoleCode = "ip_executive",
-                    Status = "active",
-                    CreatedAt = now,
-                    UpdatedAt = now,
-                    CreatedBy = 0,
-                    UpdatedBy = 0
-                }
-            };
+                };
 
-            foreach (var u in defaultUsers)
-            {
-                if (string.IsNullOrWhiteSpace(u.CompanyId)) u.CompanyId = defaultCompanyId;
-                if (string.IsNullOrWhiteSpace(u.Company)) u.Company = defaultCompanyName;
+                await usersCollection.InsertOneAsync(adminUser, cancellationToken: cancellationToken);
             }
+            else
+            {
+                if (string.IsNullOrWhiteSpace(adminUser.CompanyId))
+                {
+                    var update = Builders<User>.Update
+                        .Set(u => u.CompanyId, defaultCompanyId)
+                        .Set(u => u.Company, defaultCompanyName)
+                        .Set(u => u.Status, "active");
+                    await usersCollection.UpdateOneAsync(u => u.Id == adminUser.Id, update, cancellationToken: cancellationToken);
+                }
+            }
+        }
+        else
+        {
+            if (await usersCollection.CountDocumentsAsync(_ => true, cancellationToken: cancellationToken) == 0)
+            {
+                var defaultUsers = new List<User>
+                {
+                    new User
+                    {
+                        Id = ObjectId.GenerateNewId().ToString(),
+                        LegacyId = 1,
+                        UserId = "U001",
+                        Username = "admin",
+                        FullName = "Quản trị hệ thống",
+                        Email = "admin@example.com",
+                        PasswordHash = HashPassword("123456"),
+                        RoleCode = "admin",
+                        Company = defaultCompanyName,
+                        CompanyId = defaultCompanyId,
+                        Status = "active",
+                        CreatedAt = now,
+                        UpdatedAt = now,
+                        CreatedBy = 0,
+                        UpdatedBy = 0
+                    },
+                    new User
+                    {
+                        Id = ObjectId.GenerateNewId().ToString(),
+                        LegacyId = 2,
+                        UserId = "U002",
+                        Username = "ceo",
+                        FullName = "Tổng giám đốc",
+                        Email = "ceo@example.com",
+                        PasswordHash = HashPassword("123456"),
+                        RoleCode = "ceo",
+                        Company = defaultCompanyName,
+                        CompanyId = defaultCompanyId,
+                        Status = "active",
+                        CreatedAt = now,
+                        UpdatedAt = now,
+                        CreatedBy = 0,
+                        UpdatedBy = 0
+                    },
+                    new User
+                    {
+                        Id = ObjectId.GenerateNewId().ToString(),
+                        LegacyId = 3,
+                        UserId = "U003",
+                        Username = "director",
+                        FullName = "Giám đốc",
+                        Email = "director@example.com",
+                        PasswordHash = HashPassword("123456"),
+                        RoleCode = "director",
+                        Company = defaultCompanyName,
+                        CompanyId = defaultCompanyId,
+                        Status = "active",
+                        CreatedAt = now,
+                        UpdatedAt = now,
+                        CreatedBy = 0,
+                        UpdatedBy = 0
+                    },
+                    new User
+                    {
+                        Id = ObjectId.GenerateNewId().ToString(),
+                        LegacyId = 4,
+                        UserId = "U004",
+                        Username = "accountant",
+                        FullName = "Kế toán",
+                        Email = "accountant@example.com",
+                        PasswordHash = HashPassword("123456"),
+                        RoleCode = "accountant",
+                        Company = defaultCompanyName,
+                        CompanyId = defaultCompanyId,
+                        Status = "active",
+                        CreatedAt = now,
+                        UpdatedAt = now,
+                        CreatedBy = 0,
+                        UpdatedBy = 0
+                    },
+                    new User
+                    {
+                        Id = ObjectId.GenerateNewId().ToString(),
+                        LegacyId = 5,
+                        UserId = "U005",
+                        Username = "sales",
+                        FullName = "Marketing/Sales",
+                        Email = "sales@example.com",
+                        PasswordHash = HashPassword("123456"),
+                        RoleCode = "marketing_sales",
+                        Status = "active",
+                        CreatedAt = now,
+                        UpdatedAt = now,
+                        CreatedBy = 0,
+                        UpdatedBy = 0
+                    },
+                    new User
+                    {
+                        Id = ObjectId.GenerateNewId().ToString(),
+                        LegacyId = 6,
+                        UserId = "U006",
+                        Username = "manager",
+                        FullName = "Quản lý IP",
+                        Email = "tuanvb96@gmail.com",
+                        PasswordHash = HashPassword("123456"),
+                        RoleCode = "ip_manager",
+                        Status = "active",
+                        CreatedAt = now,
+                        UpdatedAt = now,
+                        CreatedBy = 0,
+                        UpdatedBy = 0
+                    },
+                    new User
+                    {
+                        Id = ObjectId.GenerateNewId().ToString(),
+                        LegacyId = 7,
+                        UserId = "U007",
+                        Username = "executive",
+                        FullName = "Chuyên viên IP",
+                        Email = "executive@example.com",
+                        PasswordHash = HashPassword("123456"),
+                        RoleCode = "ip_executive",
+                        Status = "active",
+                        CreatedAt = now,
+                        UpdatedAt = now,
+                        CreatedBy = 0,
+                        UpdatedBy = 0
+                    }
+                };
 
-            await usersCollection.InsertManyAsync(defaultUsers, cancellationToken: cancellationToken);
+                foreach (var u in defaultUsers)
+                {
+                    if (string.IsNullOrWhiteSpace(u.CompanyId)) u.CompanyId = defaultCompanyId;
+                    if (string.IsNullOrWhiteSpace(u.Company)) u.Company = defaultCompanyName;
+                }
+
+                await usersCollection.InsertManyAsync(defaultUsers, cancellationToken: cancellationToken);
+            }
         }
 
         var nsnnSourcesCollection = db.GetCollection<NsnnSource>("nsnn_sources");
-        if (await nsnnSourcesCollection.CountDocumentsAsync(_ => true, cancellationToken: cancellationToken) == 0)
+        if (!isProdSeed && await nsnnSourcesCollection.CountDocumentsAsync(_ => true, cancellationToken: cancellationToken) == 0)
         {
             var today = DateTime.Now.ToString("yyyy-MM-dd");
             var nsnnSources = new List<NsnnSource>
@@ -453,7 +566,7 @@ public class DatabaseSeeder : IHostedService
         }
 
         var projectCodesCollection = db.GetCollection<ProjectCode>("project_codes");
-        if (await projectCodesCollection.CountDocumentsAsync(_ => true, cancellationToken: cancellationToken) == 0)
+        if (!isProdSeed && await projectCodesCollection.CountDocumentsAsync(_ => true, cancellationToken: cancellationToken) == 0)
         {
             var today = DateTime.Now.ToString("yyyy-MM-dd");
             var projectCodes = new List<ProjectCode>
@@ -475,7 +588,7 @@ public class DatabaseSeeder : IHostedService
         }
 
         var customersCollection = db.GetCollection<Customer>("customers");
-        if (await customersCollection.CountDocumentsAsync(_ => true, cancellationToken: cancellationToken) == 0)
+        if (!isProdSeed && await customersCollection.CountDocumentsAsync(_ => true, cancellationToken: cancellationToken) == 0)
         {
             var customers = new List<Customer>
             {
@@ -789,7 +902,7 @@ public class DatabaseSeeder : IHostedService
 
             await customersCollection.InsertManyAsync(customers, cancellationToken: cancellationToken);
         }
-        else
+        else if (!isProdSeed)
         {
             // Ensure 2026 customers exist if collection is not empty
             var existing2026Customer = await customersCollection.Find(x => x.Email == "nguyenvanf@example.com").FirstOrDefaultAsync(cancellationToken);
@@ -894,7 +1007,7 @@ public class DatabaseSeeder : IHostedService
         }
 
         var costsCollection = db.GetCollection<Cost>("costs");
-        if (await costsCollection.CountDocumentsAsync(_ => true, cancellationToken: cancellationToken) == 0)
+        if (!isProdSeed && await costsCollection.CountDocumentsAsync(_ => true, cancellationToken: cancellationToken) == 0)
         {
             var costs = new List<Cost>
             {
@@ -1305,16 +1418,16 @@ public class DatabaseSeeder : IHostedService
         var rolesCollection = db.GetCollection<Role>("roles");
         var defaultRoles = new List<Role>
         {
-            new Role { Code = "marketing_sales", Name = "Marketing/Sales", IsActive = true },
-            new Role { Code = "ip_executive", Name = "IP Executive", IsActive = true },
-            new Role { Code = "ip_manager", Name = "IP Manager", IsActive = true },
-            new Role { Code = "accountant", Name = "Kế toán", IsActive = true },
-            new Role { Code = "director", Name = "Giám đốc", IsActive = true },
-            new Role { Code = "ceo", Name = "Tổng giám đốc", IsActive = true },
-            new Role { Code = "assistant_ceo", Name = "Trợ lý Tổng giám đốc", IsActive = true },
-            new Role { Code = "hr", Name = "Nhân sự", IsActive = true },
-            new Role { Code = "assistant_director", Name = "Trợ lý Giám đốc", IsActive = true },
-            new Role { Code = "admin", Name = "Admin", IsActive = true }
+            new Role { Code = "marketing_sales", Name = "Marketing/Sales", IsActive = true, IsSystem = true },
+            new Role { Code = "ip_executive", Name = "IP Executive", IsActive = true, IsSystem = true },
+            new Role { Code = "ip_manager", Name = "IP Manager", IsActive = true, IsSystem = true },
+            new Role { Code = "accountant", Name = "Kế toán", IsActive = true, IsSystem = true },
+            new Role { Code = "director", Name = "Giám đốc", IsActive = true, IsSystem = true },
+            new Role { Code = "ceo", Name = "Tổng giám đốc", IsActive = true, IsSystem = true },
+            new Role { Code = "assistant_ceo", Name = "Trợ lý Tổng giám đốc", IsActive = true, IsSystem = true },
+            new Role { Code = "hr", Name = "Nhân sự", IsActive = true, IsSystem = true },
+            new Role { Code = "assistant_director", Name = "Trợ lý Giám đốc", IsActive = true, IsSystem = true },
+            new Role { Code = "admin", Name = "Admin", IsActive = true, IsSystem = true }
         };
 
         foreach (var r in defaultRoles)
@@ -1329,6 +1442,7 @@ public class DatabaseSeeder : IHostedService
             {
                 existing.Name = r.Name;
                 existing.IsActive = r.IsActive;
+                existing.IsSystem = r.IsSystem || existing.IsSystem;
                 await rolesCollection.ReplaceOneAsync(x => x.Id == existing.Id, existing, cancellationToken: cancellationToken);
             }
         }
@@ -2080,7 +2194,9 @@ public class DatabaseSeeder : IHostedService
             }
         }
 
-        Console.WriteLine("--- CHECKING 2026 DATA ---");
+        if (!isProdSeed)
+        {
+            Console.WriteLine("--- CHECKING 2026 DATA ---");
 
         // 7. Supplement Data for 2026 (Customers and Costs) to make charts look full
         // Check if we have enough customers in 2026
@@ -2517,6 +2633,8 @@ public class DatabaseSeeder : IHostedService
             }
         }
 
+        }
+
         // ---------------------------------------------------------
         // Ensure Scheduling Module Fields and Permissions Exist
         // ---------------------------------------------------------
@@ -2669,6 +2787,78 @@ public class DatabaseSeeder : IHostedService
             await fpCollection.UpdateOneAsync(
                 p => p.ModuleCode == "projects" && p.FieldCode == "manageTasks" && p.RoleCode == roleCode,
                 Builders<FieldPermission>.Update.Set(p => p.PermissionLevel, manageTasksLevel),
+                new UpdateOptions { IsUpsert = true },
+                cancellationToken
+            );
+        }
+
+        var permissionAdminFields = new List<FieldDef>
+        {
+            new FieldDef { ModuleCode = "permissions", Code = "view", Label = "Xem cấu hình phân quyền", GroupCode = "view", GroupLabel = "Xem", OrderIndex = 1 },
+            new FieldDef { ModuleCode = "permissions", Code = "manage", Label = "Cập nhật phân quyền", GroupCode = "actions", GroupLabel = "Chức năng", OrderIndex = 2 }
+        };
+
+        foreach (var field in permissionAdminFields)
+        {
+            var existingField = await fieldsCollection.Find(f => f.ModuleCode == field.ModuleCode && f.Code == field.Code).FirstOrDefaultAsync(cancellationToken);
+            if (existingField == null)
+            {
+                field.Id = ObjectId.GenerateNewId().ToString();
+                await fieldsCollection.InsertOneAsync(field, cancellationToken: cancellationToken);
+            }
+        }
+
+        foreach (var roleCode in permissionRoles)
+        {
+            var viewLevel = (roleCode == "admin" || roleCode == "ceo" || roleCode == "assistant_ceo") ? "R" : "N";
+            var manageLevel = (roleCode == "admin" || roleCode == "ceo") ? "A" : (roleCode == "assistant_ceo" ? "W" : "N");
+
+            await fpCollection.UpdateOneAsync(
+                p => p.ModuleCode == "permissions" && p.FieldCode == "view" && p.RoleCode == roleCode,
+                Builders<FieldPermission>.Update.Set(p => p.PermissionLevel, viewLevel),
+                new UpdateOptions { IsUpsert = true },
+                cancellationToken
+            );
+
+            await fpCollection.UpdateOneAsync(
+                p => p.ModuleCode == "permissions" && p.FieldCode == "manage" && p.RoleCode == roleCode,
+                Builders<FieldPermission>.Update.Set(p => p.PermissionLevel, manageLevel),
+                new UpdateOptions { IsUpsert = true },
+                cancellationToken
+            );
+        }
+
+        var roleManagementFields = new List<FieldDef>
+        {
+            new FieldDef { ModuleCode = "roles", Code = "view", Label = "Xem danh sách chức danh", GroupCode = "view", GroupLabel = "Xem", OrderIndex = 1 },
+            new FieldDef { ModuleCode = "roles", Code = "manage", Label = "Thêm/Sửa/Xóa chức danh", GroupCode = "actions", GroupLabel = "Chức năng", OrderIndex = 2 }
+        };
+
+        foreach (var field in roleManagementFields)
+        {
+            var existingField = await fieldsCollection.Find(f => f.ModuleCode == field.ModuleCode && f.Code == field.Code).FirstOrDefaultAsync(cancellationToken);
+            if (existingField == null)
+            {
+                field.Id = ObjectId.GenerateNewId().ToString();
+                await fieldsCollection.InsertOneAsync(field, cancellationToken: cancellationToken);
+            }
+        }
+
+        foreach (var roleCode in permissionRoles)
+        {
+            var viewLevel = (roleCode == "admin" || roleCode == "ceo" || roleCode == "assistant_ceo") ? "R" : "N";
+            var manageLevel = (roleCode == "admin" || roleCode == "ceo") ? "A" : (roleCode == "assistant_ceo" ? "W" : "N");
+
+            await fpCollection.UpdateOneAsync(
+                p => p.ModuleCode == "roles" && p.FieldCode == "view" && p.RoleCode == roleCode,
+                Builders<FieldPermission>.Update.Set(p => p.PermissionLevel, viewLevel),
+                new UpdateOptions { IsUpsert = true },
+                cancellationToken
+            );
+
+            await fpCollection.UpdateOneAsync(
+                p => p.ModuleCode == "roles" && p.FieldCode == "manage" && p.RoleCode == roleCode,
+                Builders<FieldPermission>.Update.Set(p => p.PermissionLevel, manageLevel),
                 new UpdateOptions { IsUpsert = true },
                 cancellationToken
             );

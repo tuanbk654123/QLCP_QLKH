@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Table, Select, Button, Tabs, message, Tag, Typography, Space, Dropdown } from 'antd';
+import { Card, Table, Button, Tabs, message, Tag, Typography, Space, Dropdown } from 'antd';
 import { SaveOutlined, ReloadOutlined } from '@ant-design/icons';
 import axios from 'axios';
 
-const { Option } = Select;
 const { Title, Text } = Typography;
 
-const PermissionModule = () => {
+const PermissionModule = ({ initialTab = 'qlkh' }) => {
   const [loading, setLoading] = useState(false);
   const [roles, setRoles] = useState([]);
   const [permissions, setPermissions] = useState({ qlkh: {}, qlcp: {}, users: {}, dashboard: {}, work_dashboard: {}, export: {}, scheduling: {}, audit: {}, companies: {}, projects: {} });
@@ -84,16 +83,6 @@ const PermissionModule = () => {
       message.error('Lỗi khi lưu phân quyền');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const getPermissionColor = (value) => {
-    switch (value) {
-      case 'A': return 'green';
-      case 'W': return 'orange';
-      case 'R': return 'blue';
-      case 'N': return 'default';
-      default: return 'default';
     }
   };
 
@@ -239,11 +228,13 @@ const PermissionModule = () => {
   };
 
   return (
-    <Card 
-      title={<Title level={4}>Quản lý Phân quyền</Title>} 
+    <Card
+      title={<Title level={4}>Quản lý Phân quyền</Title>}
       extra={
         <Space>
-          <Button icon={<ReloadOutlined />} onClick={fetchPermissions}>Làm mới</Button>
+          <Button icon={<ReloadOutlined />} onClick={fetchPermissions}>
+            Làm mới
+          </Button>
           <Button type="primary" icon={<SaveOutlined />} onClick={handleSave} loading={loading}>
             Lưu thay đổi
           </Button>
@@ -251,7 +242,7 @@ const PermissionModule = () => {
       }
     >
       <Tabs
-        defaultActiveKey="qlkh"
+        defaultActiveKey={initialTab}
         items={[
           {
             key: 'companies',

@@ -11,6 +11,7 @@ export const AuthProvider = ({ children }) => {
   const [modulePermissions, setModulePermissions] = useState({});
   const [companies, setCompanies] = useState([]);
   const [activeCompanyId, setActiveCompanyId] = useState(null);
+  const [activeCompanyScope, setActiveCompanyScope] = useState('single');
 
   const setAuthToken = (token) => {
     if (token) {
@@ -49,9 +50,11 @@ export const AuthProvider = ({ children }) => {
       const res = await axios.get('/api/auth/companies');
       setCompanies(res.data.items || []);
       setActiveCompanyId(res.data.activeCompanyId || null);
+      setActiveCompanyScope(res.data.activeScope || 'single');
     } catch (error) {
       setCompanies([]);
       setActiveCompanyId(null);
+      setActiveCompanyScope('single');
     }
   };
 
@@ -68,12 +71,14 @@ export const AuthProvider = ({ children }) => {
         setModulePermissions({});
         setCompanies([]);
         setActiveCompanyId(null);
+        setActiveCompanyScope('single');
       }
     } catch (error) {
       setUser(null);
       setModulePermissions({});
       setCompanies([]);
       setActiveCompanyId(null);
+      setActiveCompanyScope('single');
     } finally {
       setLoading(false);
     }
@@ -117,7 +122,8 @@ export const AuthProvider = ({ children }) => {
       if (token && userData) {
         setAuthToken(token);
         setUser(userData);
-        setActiveCompanyId(companyId);
+        setActiveCompanyId(userData.companyId || null);
+        setActiveCompanyScope(userData.companyScope || 'single');
         window.location.reload();
         return { success: true };
       }
@@ -138,6 +144,7 @@ export const AuthProvider = ({ children }) => {
       setModulePermissions({});
       setCompanies([]);
       setActiveCompanyId(null);
+      setActiveCompanyScope('single');
     }
     return { success: true };
   };
@@ -191,6 +198,7 @@ export const AuthProvider = ({ children }) => {
         modulePermissions,
         companies,
         activeCompanyId,
+        activeCompanyScope,
         login,
         logout,
         switchCompany,

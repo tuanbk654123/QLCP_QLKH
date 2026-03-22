@@ -36,6 +36,8 @@ public class PermissionService : IPermissionService
             Label = r.Name
         }).ToList();
 
+        var permissionsFields = fields.Where(f => f.ModuleCode == "permissions").ToList();
+        var rolesFields = fields.Where(f => f.ModuleCode == "roles").ToList();
         var qlkhFields = fields.Where(f => f.ModuleCode == "qlkh" && f.Code != "auditLog").ToList();
         var qlcpFields = fields.Where(f => f.ModuleCode == "qlcp" && f.Code != "auditLog").ToList();
         var userFields = fields.Where(f => f.ModuleCode == "users").ToList();
@@ -47,6 +49,8 @@ public class PermissionService : IPermissionService
         var companyFields = fields.Where(f => f.ModuleCode == "companies").ToList();
         var projectFields = fields.Where(f => f.ModuleCode == "projects").ToList();
 
+        var permissionsGroups = BuildFieldGroups(permissionsFields);
+        var rolesGroups = BuildFieldGroups(rolesFields);
         var qlkhGroups = BuildFieldGroups(qlkhFields);
         var qlcpGroups = BuildFieldGroups(qlcpFields);
         var userGroups = BuildFieldGroups(userFields);
@@ -58,6 +62,8 @@ public class PermissionService : IPermissionService
         var companyGroups = BuildFieldGroups(companyFields);
         var projectGroups = BuildFieldGroups(projectFields);
 
+        var permissionsPerm = BuildPermissionMap("permissions", permissionsFields, roles, fieldPermissions);
+        var rolesPerm = BuildPermissionMap("roles", rolesFields, roles, fieldPermissions);
         var qlkhPerm = BuildPermissionMap("qlkh", qlkhFields, roles, fieldPermissions);
         var qlcpPerm = BuildPermissionMap("qlcp", qlcpFields, roles, fieldPermissions);
         var userPerm = BuildPermissionMap("users", userFields, roles, fieldPermissions);
@@ -72,6 +78,8 @@ public class PermissionService : IPermissionService
         return new PermissionMatrixDto
         {
             Roles = roleDtos,
+            PermissionsFields = permissionsGroups,
+            RolesFields = rolesGroups,
             QlkhFields = qlkhGroups,
             QlcpFields = qlcpGroups,
             UserFields = userGroups,
@@ -82,6 +90,8 @@ public class PermissionService : IPermissionService
             AuditFields = auditGroups,
             CompanyFields = companyGroups,
             ProjectFields = projectGroups,
+            PermissionsPermissions = permissionsPerm,
+            RolesPermissions = rolesPerm,
             QlkhPermissions = qlkhPerm,
             QlcpPermissions = qlcpPerm,
             UserPermissions = userPerm,
@@ -150,7 +160,7 @@ public class PermissionService : IPermissionService
         foreach (var field in fields)
         {
             var fp = permissions.FirstOrDefault(p => p.FieldCode == field.Code);
-            var level = fp?.PermissionLevel ?? "R";
+            var level = fp?.PermissionLevel ?? "N";
             result[field.Code] = level;
         }
 
@@ -178,7 +188,7 @@ public class PermissionService : IPermissionService
             var roles = await _roles.Find(_ => true).ToListAsync();
             foreach (var role in roles)
             {
-                var level = (role.Code == "admin" || role.Code == "ceo") ? "A" : "R";
+                var level = (role.Code == "admin" || role.Code == "ceo") ? "A" : "N";
                 await _fieldPermissions.InsertOneAsync(new FieldPermission
                 {
                     Id = MongoDB.Bson.ObjectId.GenerateNewId().ToString(),
@@ -214,7 +224,7 @@ public class PermissionService : IPermissionService
                     p.FieldCode == fieldCode &&
                     p.RoleCode == role.Code);
 
-                var level = fp?.PermissionLevel ?? "R";
+                var level = fp?.PermissionLevel ?? "N";
                 result[fieldCode][role.Code] = level;
             }
         }

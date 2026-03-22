@@ -18,6 +18,7 @@ import {
   CalendarOutlined,
   HistoryOutlined,
   BarChartOutlined,
+  TagsOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../context/AuthContext';
 import { useNotification } from '../../context/NotificationContext';
@@ -40,7 +41,7 @@ const AppLayout = ({ children }) => {
   }, [location.pathname]);
 
   const isMobile = !screens.lg;
-  const { user, logout, canAccessUsersModule, canAccessPermissions, canAccessAuditLogs, getPermissionLevel, isAdmin, companies, activeCompanyId, switchCompany } = useAuth();
+  const { user, logout, canAccessUsersModule, canAccessPermissions, canAccessAuditLogs, getPermissionLevel, isAdmin, companies, activeCompanyId, activeCompanyScope, switchCompany } = useAuth();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotification();
   const [visible, setVisible] = useState(false);
 
@@ -143,25 +144,11 @@ const AppLayout = ({ children }) => {
         label: 'Quản lý tài chính - kế toán',
       },
       {
-        key: '/scheduling',
-        icon: <CalendarOutlined />,
-        label: 'Chấm công dự án',
-      },
-      {
         key: '/projects',
         icon: <CheckCircleOutlined />,
         label: 'Quản lý dự án',
       },
     ];
-
-    const exportDocPerm = getPermissionLevel('export', 'export_doc');
-    if (exportDocPerm && exportDocPerm !== 'N') {
-      items.push({
-        key: '/export-word',
-        icon: <FileTextOutlined />,
-        label: 'Xuất văn bản',
-      });
-    }
 
     if (canAccessUsersModule()) {
       items.push({
@@ -180,9 +167,30 @@ const AppLayout = ({ children }) => {
       });
 
       items.push({
+        key: '/roles',
+        icon: <TagsOutlined />,
+        label: 'Quản lý chức danh',
+      });
+
+      items.push({
         key: '/companies',
         icon: <ShopOutlined />,
         label: 'Quản lý công ty',
+      });
+    }
+
+    items.push({
+      key: '/scheduling',
+      icon: <CalendarOutlined />,
+      label: 'Chấm công dự án',
+    });
+
+    const exportDocPerm = getPermissionLevel('export', 'export_doc');
+    if (exportDocPerm && exportDocPerm !== 'N') {
+      items.push({
+        key: '/export-word',
+        icon: <FileTextOutlined />,
+        label: 'Xuất văn bản',
       });
     }
 
@@ -279,10 +287,13 @@ const AppLayout = ({ children }) => {
           <Space size={isMobile ? "small" : "large"}>
             {!isMobile && companies && companies.length > 1 && (
               <Select
-                value={activeCompanyId || undefined}
+                value={activeCompanyScope === 'all' ? '__ALL__' : activeCompanyId || undefined}
                 style={{ width: 220 }}
                 onChange={(v) => switchCompany(v)}
-                options={(companies || []).map((c) => ({ value: c.id, label: `${c.code} - ${c.name}` }))}
+                options={[
+                  { value: '__ALL__', label: 'Tất cả công ty' },
+                  ...(companies || []).map((c) => ({ value: c.id, label: `${c.code} - ${c.name}` })),
+                ]}
               />
             )}
             <Popover

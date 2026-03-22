@@ -27,6 +27,8 @@ public class PermissionsController : ControllerBase
             roles = matrix.Roles.Select(r => new { key = r.Key, label = r.Label }),
             permissions = new
             {
+                permissions = matrix.PermissionsPermissions,
+                roles = matrix.RolesPermissions,
                 qlkh = matrix.QlkhPermissions,
                 qlcp = matrix.QlcpPermissions,
                 users = matrix.UserPermissions,
@@ -38,6 +40,18 @@ public class PermissionsController : ControllerBase
                 companies = matrix.CompanyPermissions,
                 projects = matrix.ProjectPermissions
             },
+            permissionsFields = matrix.PermissionsFields.Select(g => new
+            {
+                key = g.Key,
+                label = g.Label,
+                children = g.Children.Select(c => new { key = c.Key, label = c.Label })
+            }),
+            rolesFields = matrix.RolesFields.Select(g => new
+            {
+                key = g.Key,
+                label = g.Label,
+                children = g.Children.Select(c => new { key = c.Key, label = c.Label })
+            }),
             qlkhFields = matrix.QlkhFields.Select(g => new
             {
                 key = g.Key,
