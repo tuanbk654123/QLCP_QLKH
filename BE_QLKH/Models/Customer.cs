@@ -16,6 +16,9 @@ public class Customer
     [BsonRepresentation(BsonType.ObjectId)]
     public string CompanyId { get; set; } = string.Empty;
 
+    [BsonElement("schema_version")]
+    public string? SchemaVersion { get; set; }
+
     [BsonElement("name")]
     public string? Name { get; set; }
 
@@ -48,6 +51,9 @@ public class Customer
 
     [BsonElement("business_needs")]
     public string? BusinessNeeds { get; set; }
+
+    [BsonElement("need_detail")]
+    public string? NeedDetail { get; set; }
 
     [BsonElement("business_scale")]
     public string? BusinessScale { get; set; }
@@ -96,6 +102,18 @@ public class Customer
 
     [BsonElement("products_services")]
     public string? ProductsServices { get; set; }
+
+    [BsonElement("product_link")]
+    public string? ProductLink { get; set; }
+
+    [BsonElement("owner_user_id")]
+    public int? OwnerUserId { get; set; }
+
+    [BsonElement("lifecycle_status")]
+    public string? LifecycleStatus { get; set; }
+
+    [BsonElement("tags")]
+    public List<string>? Tags { get; set; }
 
     [BsonElement("ip_group")]
     public string? IpGroup { get; set; }

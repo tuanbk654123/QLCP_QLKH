@@ -1,4 +1,5 @@
 using BE_QLKH.Models;
+using BE_QLKH.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -12,12 +13,13 @@ namespace BE_QLKH.Controllers;
 [Authorize]
 public class ContractsController : ControllerBase
 {
+    private readonly IMongoDatabase _db;
     private readonly IMongoCollection<Contract> _contracts;
 
     public ContractsController(IMongoClient client, IOptions<MongoDbSettings> options)
     {
-        var db = client.GetDatabase(options.Value.DatabaseName);
-        _contracts = db.GetCollection<Contract>("contracts");
+        _db = client.GetDatabase(options.Value.DatabaseName);
+        _contracts = _db.GetCollection<Contract>("contracts");
     }
 
     [HttpGet]
@@ -25,7 +27,8 @@ public class ContractsController : ControllerBase
     {
         if (page < 1) page = 1;
 
-        var filter = Builders<Contract>.Filter.Empty;
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
+        var filter = TenantContext.CompanyFilter<Contract>(companyId);
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -100,7 +103,10 @@ public class ContractsController : ControllerBase
     [HttpGet("{id:int}")]
     public async Task<ActionResult<object>> GetContractByLegacyId(int id)
     {
-        var contract = await _contracts.Find(c => c.LegacyId == id).FirstOrDefaultAsync();
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
+        var filter = TenantContext.CompanyFilter<Contract>(companyId) & Builders<Contract>.Filter.Eq(c => c.LegacyId, id);
+
+        var contract = await _contracts.Find(filter).FirstOrDefaultAsync();
         if (contract == null) return NotFound(new { message = "Contract not found" });
 
         return Ok(new
@@ -149,14 +155,11 @@ public class ContractsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<object>> CreateContract([FromBody] Contract input)
     {
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
+
         input.Id = ObjectId.GenerateNewId().ToString();
-
-        var maxLegacyId = await _contracts.Find(_ => true)
-            .SortByDescending(c => c.LegacyId)
-            .Limit(1)
-            .FirstOrDefaultAsync();
-
-        input.LegacyId = maxLegacyId != null ? maxLegacyId.LegacyId + 1 : 1;
+        input.CompanyId = companyId;
+        input.LegacyId = await TenantContext.GetNextLegacyIdAsync(_db, companyId, "contracts", HttpContext.RequestAborted);
 
         await _contracts.InsertOneAsync(input);
 
@@ -206,11 +209,15 @@ public class ContractsController : ControllerBase
     [HttpPut("{id:int}")]
     public async Task<ActionResult<object>> UpdateContract(int id, [FromBody] Contract input)
     {
-        var contract = await _contracts.Find(c => c.LegacyId == id).FirstOrDefaultAsync();
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
+        var filter = TenantContext.CompanyFilter<Contract>(companyId) & Builders<Contract>.Filter.Eq(c => c.LegacyId, id);
+
+        var contract = await _contracts.Find(filter).FirstOrDefaultAsync();
         if (contract == null) return NotFound(new { message = "Contract not found" });
 
         input.Id = contract.Id;
         input.LegacyId = contract.LegacyId;
+        input.CompanyId = contract.CompanyId;
 
         await _contracts.ReplaceOneAsync(c => c.Id == contract.Id, input);
 
@@ -260,7 +267,10 @@ public class ContractsController : ControllerBase
     [HttpDelete("{id:int}")]
     public async Task<ActionResult<object>> DeleteContract(int id)
     {
-        var result = await _contracts.DeleteOneAsync(c => c.LegacyId == id);
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
+        var filter = TenantContext.CompanyFilter<Contract>(companyId) & Builders<Contract>.Filter.Eq(c => c.LegacyId, id);
+
+        var result = await _contracts.DeleteOneAsync(filter);
         if (result.DeletedCount == 0) return NotFound(new { message = "Contract not found" });
         return Ok(new { message = "Contract deleted" });
     }

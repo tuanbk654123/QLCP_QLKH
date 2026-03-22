@@ -9,14 +9,17 @@ const { Title, Text } = Typography;
 const PermissionModule = () => {
   const [loading, setLoading] = useState(false);
   const [roles, setRoles] = useState([]);
-  const [permissions, setPermissions] = useState({ qlkh: {}, qlcp: {}, users: {}, dashboard: {}, export: {}, scheduling: {}, audit: {} });
+  const [permissions, setPermissions] = useState({ qlkh: {}, qlcp: {}, users: {}, dashboard: {}, work_dashboard: {}, export: {}, scheduling: {}, audit: {}, companies: {}, projects: {} });
   const [qlkhFields, setQlkhFields] = useState([]);
   const [qlcpFields, setQlcpFields] = useState([]);
   const [schedulingFields, setSchedulingFields] = useState([]);
   const [userFields, setUserFields] = useState([]);
   const [dashboardFields, setDashboardFields] = useState([]);
+  const [workDashboardFields, setWorkDashboardFields] = useState([]);
   const [exportFields, setExportFields] = useState([]);
   const [auditFields, setAuditFields] = useState([]);
+  const [companyFields, setCompanyFields] = useState([]);
+  const [projectFields, setProjectFields] = useState([]);
 
   useEffect(() => {
     fetchPermissions();
@@ -33,17 +36,23 @@ const PermissionModule = () => {
         qlcp: data.permissions?.qlcp || {},
         users: data.permissions?.users || {},
         dashboard: data.permissions?.dashboard || {},
+        work_dashboard: data.permissions?.work_dashboard || {},
         export: data.permissions?.export || {},
         scheduling: data.permissions?.scheduling || {},
         audit: data.permissions?.audit || {},
+        companies: data.permissions?.companies || {},
+        projects: data.permissions?.projects || {},
       });
       setQlkhFields(data.qlkhFields || []);
       setQlcpFields(data.qlcpFields || []);
       setSchedulingFields(data.schedulingFields || []);
       setUserFields(data.userFields || []);
       setDashboardFields(data.dashboardFields || []);
+      setWorkDashboardFields(data.workDashboardFields || []);
       setExportFields(data.exportFields || []);
       setAuditFields(data.auditFields || []);
+      setCompanyFields(data.companyFields || []);
+      setProjectFields(data.projectFields || []);
     } catch (error) {
       console.error('Failed to fetch permissions:', error);
       message.error('Không thể tải dữ liệu phân quyền');
@@ -245,6 +254,11 @@ const PermissionModule = () => {
         defaultActiveKey="qlkh"
         items={[
           {
+            key: 'companies',
+            label: 'Quản lý công ty',
+            children: renderTable('companies', companyFields),
+          },
+          {
             key: 'qlkh',
             label: 'Quản lý Khách hàng',
             children: renderTable('qlkh', qlkhFields),
@@ -260,9 +274,19 @@ const PermissionModule = () => {
             children: renderTable('users', userFields),
           },
           {
+            key: 'projects',
+            label: 'Quản lý dự án',
+            children: renderTable('projects', projectFields),
+          },
+          {
             key: 'dashboard',
             label: 'Dashboard',
             children: renderTable('dashboard', dashboardFields),
+          },
+          {
+            key: 'work_dashboard',
+            label: 'Dashboard công việc',
+            children: renderTable('work_dashboard', workDashboardFields),
           },
           {
             key: 'export',

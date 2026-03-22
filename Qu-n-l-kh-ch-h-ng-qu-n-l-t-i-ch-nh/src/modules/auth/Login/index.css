@@ -1,30 +1,132 @@
 .login-container {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: #f3f6ff;
+  overflow: hidden;
+}
+
+.login-left {
+  padding: 42px 56px;
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
-  min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 20px;
+  position: relative;
 }
 
-.login-card {
+.login-left-content {
   width: 100%;
-  max-width: 400px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  max-width: 520px;
+  transform: translateY(-22px);
 }
 
-.login-info {
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid #f0f0f0;
-  font-size: 12px;
-  color: #666;
+.login-title {
+  margin-top: 0 !important;
+  margin-bottom: 18px !important;
+  color: #111827 !important;
 }
 
-.login-info code {
-  background: #f5f5f5;
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-family: monospace;
+.login-left .ant-form-item-label > label {
+  font-weight: 600;
+  color: #111827;
 }
 
+.login-left .ant-input,
+.login-left .ant-input-affix-wrapper {
+  border-radius: 999px;
+  height: 46px;
+  background: #ffffff;
+}
+
+.login-left .ant-input-affix-wrapper {
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  background: #ffffff;
+}
+
+.login-left .ant-input-affix-wrapper .ant-input-prefix,
+.login-left .ant-input-affix-wrapper .ant-input-suffix {
+  display: inline-flex;
+  align-items: center;
+}
+
+.login-left .ant-input {
+  line-height: 44px;
+  background: #ffffff;
+}
+
+.login-left .ant-input-affix-wrapper:hover,
+.login-left .ant-input-affix-wrapper:focus,
+.login-left .ant-input-affix-wrapper-focused {
+  background: #ffffff;
+}
+
+.login-left input:-webkit-autofill,
+.login-left input:-webkit-autofill:hover,
+.login-left input:-webkit-autofill:focus,
+.login-left input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+  box-shadow: 0 0 0 1000px #ffffff inset !important;
+  -webkit-text-fill-color: #111827 !important;
+}
+
+.login-submit {
+  height: 48px !important;
+  border-radius: 999px !important;
+  background: linear-gradient(90deg, #8c7cff 0%, #6d5dfc 55%, #5a4bff 100%) !important;
+  border: none !important;
+  box-shadow: 0 16px 40px rgba(109, 93, 252, 0.35);
+}
+
+.login-footer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 18px;
+  text-align: center;
+}
+
+.login-right {
+  position: relative;
+  background: linear-gradient(135deg, #7a6bff 0%, #5c4dff 40%, #6d5dfc 100%);
+}
+
+.login-blob {
+  position: absolute;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.login-blob-1 {
+  width: 520px;
+  height: 520px;
+  top: -220px;
+  left: -120px;
+}
+
+.login-blob-2 {
+  width: 420px;
+  height: 420px;
+  bottom: -200px;
+  right: -140px;
+}
+
+@media (max-width: 960px) {
+  .login-container {
+    grid-template-columns: 1fr;
+  }
+
+  .login-right {
+    display: none;
+  }
+
+  .login-left {
+    padding: 32px 20px;
+  }
+
+  .login-left-content {
+    max-width: 520px;
+  }
+}

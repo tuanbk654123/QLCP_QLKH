@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Card, Row, Col, Statistic, DatePicker, Select, Space } from 'antd';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Button, Card, Row, Col, Statistic, DatePicker, Select, Space, Table } from 'antd';
 import {
   UserOutlined,
   DollarOutlined,
@@ -23,6 +23,7 @@ import {
 } from 'recharts';
 import axios from 'axios';
 import dayjs from 'dayjs';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import './index.css';
 
@@ -31,14 +32,25 @@ const { Option } = Select;
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#FF6666', '#AAAAAA'];
 
-const Dashboard = () => {
+const formatCurrency = (amount) => {
+  return new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency: 'VND',
+  }).format(amount);
+};
+
+const Dashboard = ({ initialScope, initialCompanyId, lockScope }) => {
   const { getPermissionLevel } = useAuth();
+  const navigate = useNavigate();
   const [stats, setStats] = useState({
     totalCustomers: 0,
     totalRevenue: 0,
   });
   const [transactions, setTransactions] = useState([]);
   const [dateRange, setDateRange] = useState(null);
+  const [allCompanies, setAllCompanies] = useState([]);
+  const [allCompanyId, setAllCompanyId] = useState(initialCompanyId || null);
+  const [breakdown, setBreakdown] = useState([]);
 
   // New states for charts
   const [customerStats, setCustomerStats] = useState([]);
@@ -46,21 +58,68 @@ const Dashboard = () => {
   const [custYear, setCustYear] = useState(dayjs().year());
   const [projMonth, setProjMonth] = useState(dayjs().month() + 1);
   const [projYear, setProjYear] = useState(dayjs().year());
-  const [scope, setScope] = useState('company');
+  const [scope, setScope] = useState(initialScope || 'company');
   const canViewAll = !!getPermissionLevel('dashboard', 'overview_all');
+
+  useEffect(() => {
+    if (initialScope) {
+      setScope(initialScope);
+    }
+  }, [initialScope]);
+
+  useEffect(() => {
+    if (typeof initialCompanyId !== 'undefined') {
+      setAllCompanyId(initialCompanyId || null);
+    }
+  }, [initialCompanyId]);
 
   useEffect(() => {
     fetchStats();
     fetchTransactions();
-  }, [dateRange, scope]);
+  }, [dateRange, scope, allCompanyId]);
 
   useEffect(() => {
     fetchCustomerGrowth();
-  }, [custYear, scope]);
+  }, [custYear, scope, allCompanyId]);
 
   useEffect(() => {
     fetchProjectCosts();
-  }, [projMonth, projYear, scope]);
+  }, [projMonth, projYear, scope, allCompanyId]);
+
+  useEffect(() => {
+    if (!canViewAll || scope !== 'all') return;
+    axios
+      .get('/api/dashboard/companies')
+      .then((res) => setAllCompanies(res.data.items || []))
+      .catch(() => setAllCompanies([]));
+  }, [canViewAll, scope]);
+
+  const selectedAllCompany = useMemo(() => {
+    if (!allCompanyId) return null;
+    return (allCompanies || []).find((c) => c.id === allCompanyId) || null;
+  }, [allCompanies, allCompanyId]);
+
+  useEffect(() => {
+    if (!canViewAll || scope !== 'all') {
+      setBreakdown([]);
+      return;
+    }
+
+    const [from, to] = dateRange || [];
+    const params = {};
+    if (from && to) {
+      params.fromDate = from.format('YYYY-MM-DD');
+      params.toDate = to.format('YYYY-MM-DD');
+    }
+    if (allCompanyId) {
+      params.companyId = allCompanyId;
+    }
+
+    axios
+      .get('/api/dashboard/overview-breakdown', { params })
+      .then((res) => setBreakdown(res.data.items || []))
+      .catch(() => setBreakdown([]));
+  }, [canViewAll, scope, dateRange, allCompanyId]);
 
   const fetchStats = async () => {
     try {
@@ -74,6 +133,9 @@ const Dashboard = () => {
       if (from && to) {
         params.fromDate = from.format('YYYY-MM-DD');
         params.toDate = to.format('YYYY-MM-DD');
+      }
+      if (scope === 'all' && allCompanyId) {
+        params.companyId = allCompanyId;
       }
 
       const allResponse = scope === 'all'
@@ -96,6 +158,9 @@ const Dashboard = () => {
         params.fromDate = from.format('YYYY-MM-DD');
         params.toDate = to.format('YYYY-MM-DD');
       }
+      if (scope === 'all' && allCompanyId) {
+        params.companyId = allCompanyId;
+      }
 
       if (scope === 'all') {
         const allRes = await axios.get('/api/dashboard/transactions-all', { params });
@@ -113,7 +178,7 @@ const Dashboard = () => {
     try {
       if (scope === 'all') {
         const response = await axios.get('/api/dashboard/customer-growth-all', {
-          params: { year: custYear }
+          params: { year: custYear, companyId: allCompanyId || undefined }
         });
         setCustomerStats(response.data);
       } else {
@@ -131,7 +196,7 @@ const Dashboard = () => {
     try {
       if (scope === 'all') {
         const response = await axios.get('/api/dashboard/project-costs-all', {
-          params: { month: projMonth, year: projYear }
+          params: { month: projMonth, year: projYear, companyId: allCompanyId || undefined }
         });
         setProjectStats(response.data);
       } else {
@@ -143,13 +208,6 @@ const Dashboard = () => {
     } catch (error) {
       console.error('Lỗi khi tải thống kê chi phí dự án:', error);
     }
-  };
-
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
-    }).format(amount);
   };
 
   const getChartData = () => {
@@ -194,12 +252,52 @@ const Dashboard = () => {
     }
   };
 
+  const breakdownColumns = useMemo(() => {
+    return [
+      { title: 'Mã', dataIndex: 'companyCode', key: 'companyCode', width: 110 },
+      { title: 'Tên công ty', dataIndex: 'companyName', key: 'companyName', width: 240 },
+      { title: 'Tổng KH', dataIndex: 'totalCustomers', key: 'totalCustomers', width: 110 },
+      { title: 'KH active', dataIndex: 'activeCustomers', key: 'activeCustomers', width: 110 },
+      {
+        title: 'Doanh thu',
+        dataIndex: 'totalRevenue',
+        key: 'totalRevenue',
+        width: 160,
+        render: (v) => formatCurrency(v || 0),
+      },
+      {
+        title: 'Chi phí',
+        dataIndex: 'totalExpense',
+        key: 'totalExpense',
+        width: 160,
+        render: (v) => formatCurrency(v || 0),
+      },
+      {
+        title: '',
+        key: 'action',
+        width: 120,
+        render: (_, r) => (
+          <Button onClick={() => navigate(`/dashboard/company/${r.companyId}`)}>Xem</Button>
+        ),
+      },
+    ];
+  }, [navigate]);
+
   return (
     <div className="dashboard-container">
       <div className="dashboard-header">
-        <h1>{scope === 'all' ? 'Dashboard - Tổng quan (Tất cả công ty)' : 'Dashboard - Tổng quan hệ thống'}</h1>
+        <h1>
+          {lockScope && selectedAllCompany
+            ? `Dashboard - ${selectedAllCompany.code} - ${selectedAllCompany.name}`
+            : scope === 'all'
+              ? 'Dashboard - Tổng quan (Tất cả công ty)'
+              : 'Dashboard - Tổng quan hệ thống'}
+        </h1>
         <div className="dashboard-controls">
-          {canViewAll && (
+          {lockScope && (
+            <Button onClick={() => navigate('/dashboard')}>Quay lại</Button>
+          )}
+          {canViewAll && !lockScope && (
             <Select
               value={scope}
               style={{ width: 220, marginRight: 12 }}
@@ -208,6 +306,28 @@ const Dashboard = () => {
                 { value: 'company', label: 'Theo công ty đang chọn' },
                 { value: 'all', label: 'Tổng các công ty' },
               ]}
+            />
+          )}
+          {canViewAll && scope === 'all' && !lockScope && (
+            <Select
+              allowClear
+              value={allCompanyId}
+              style={{ width: 260, marginRight: 12 }}
+              placeholder="Tất cả công ty"
+              onChange={(v) => setAllCompanyId(v || null)}
+              options={(allCompanies || []).map((c) => ({ value: c.id, label: `${c.code} - ${c.name}` }))}
+            />
+          )}
+          {canViewAll && scope === 'all' && lockScope && (
+            <Select
+              disabled
+              value={allCompanyId}
+              style={{ width: 260, marginRight: 12 }}
+              options={
+                selectedAllCompany
+                  ? [{ value: selectedAllCompany.id, label: `${selectedAllCompany.code} - ${selectedAllCompany.name}` }]
+                  : []
+              }
             />
           )}
           <Select
@@ -279,6 +399,18 @@ const Dashboard = () => {
           </Card>
         </Col>
       </Row>
+
+      {canViewAll && scope === 'all' && (
+        <Card style={{ marginTop: 16 }} title="Tổng quan theo công ty">
+          <Table
+            rowKey="companyId"
+            columns={breakdownColumns}
+            dataSource={breakdown}
+            pagination={false}
+            scroll={{ x: 900 }}
+          />
+        </Card>
+      )}
 
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
         <Col xs={24} lg={16}>
@@ -509,3 +641,8 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+
+export const DashboardCompanyRoute = () => {
+  const { companyId } = useParams();
+  return <Dashboard initialScope="all" initialCompanyId={companyId} lockScope={true} />;
+};

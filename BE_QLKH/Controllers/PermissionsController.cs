@@ -31,9 +31,12 @@ public class PermissionsController : ControllerBase
                 qlcp = matrix.QlcpPermissions,
                 users = matrix.UserPermissions,
                 dashboard = matrix.DashboardPermissions,
+                work_dashboard = matrix.WorkDashboardPermissions,
                 export = matrix.ExportPermissions,
                 scheduling = matrix.SchedulingPermissions,
-                audit = matrix.AuditPermissions
+                audit = matrix.AuditPermissions,
+                companies = matrix.CompanyPermissions,
+                projects = matrix.ProjectPermissions
             },
             qlkhFields = matrix.QlkhFields.Select(g => new
             {
@@ -59,6 +62,12 @@ public class PermissionsController : ControllerBase
                 label = g.Label,
                 children = g.Children.Select(c => new { key = c.Key, label = c.Label })
             }),
+            workDashboardFields = matrix.WorkDashboardFields.Select(g => new
+            {
+                key = g.Key,
+                label = g.Label,
+                children = g.Children.Select(c => new { key = c.Key, label = c.Label })
+            }),
             exportFields = matrix.ExportFields.Select(g => new
             {
                 key = g.Key,
@@ -72,6 +81,18 @@ public class PermissionsController : ControllerBase
                 children = g.Children.Select(c => new { key = c.Key, label = c.Label })
             }),
             auditFields = matrix.AuditFields.Select(g => new
+            {
+                key = g.Key,
+                label = g.Label,
+                children = g.Children.Select(c => new { key = c.Key, label = c.Label })
+            }),
+            companyFields = matrix.CompanyFields.Select(g => new
+            {
+                key = g.Key,
+                label = g.Label,
+                children = g.Children.Select(c => new { key = c.Key, label = c.Label })
+            }),
+            projectFields = matrix.ProjectFields.Select(g => new
             {
                 key = g.Key,
                 label = g.Label,

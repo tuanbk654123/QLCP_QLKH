@@ -19,6 +19,7 @@ namespace BE_QLKH.Controllers;
 [Authorize]
 public class CostsController : ControllerBase
 {
+    private readonly IMongoDatabase _db;
     private readonly IMongoCollection<Cost> _costs;
     private readonly IMongoCollection<User> _users;
     private readonly IMongoCollection<Notification> _notifications;
@@ -36,11 +37,11 @@ public class CostsController : ControllerBase
         IEmailService emailService,
         IAuditLogService auditLogService)
     {
-        var db = client.GetDatabase(options.Value.DatabaseName);
-        _costs = db.GetCollection<Cost>("costs");
-        _users = db.GetCollection<User>("users");
-        _notifications = db.GetCollection<Notification>("notifications");
-        _userCompanies = db.GetCollection<UserCompany>("user_companies");
+        _db = client.GetDatabase(options.Value.DatabaseName);
+        _costs = _db.GetCollection<Cost>("costs");
+        _users = _db.GetCollection<User>("users");
+        _notifications = _db.GetCollection<Notification>("notifications");
+        _userCompanies = _db.GetCollection<UserCompany>("user_companies");
         _hubContext = hubContext;
         _logger = logger;
         _emailService = emailService;
@@ -71,7 +72,7 @@ public class CostsController : ControllerBase
         if (int.TryParse(legacyIdStr, out int currentUserId))
         {
             // Define roles that can view ALL costs
-            var viewAllRoles = new[] { "admin", "director", "giam_doc", "manager", "ip_manager", "quan_ly", "accountant", "ke_toan", "marketing_sales", "sales" };
+            var viewAllRoles = new[] { "admin", "ceo", "assistant_ceo", "director", "giam_doc", "manager", "ip_manager", "quan_ly", "accountant", "ke_toan", "marketing_sales", "sales" };
             
             if (!viewAllRoles.Contains(userRole))
             {
@@ -202,14 +203,16 @@ public class CostsController : ControllerBase
     public async Task<ActionResult<object>> GetCostByLegacyId(int id)
     {
         var companyId = TenantContext.GetCompanyIdOrThrow(User);
-        var cost = await _costs.Find(TenantContext.CompanyFilter<Cost>(companyId) & Builders<Cost>.Filter.Eq(c => c.LegacyId, id)).FirstOrDefaultAsync();
+        var filter = TenantContext.CompanyFilter<Cost>(companyId) & Builders<Cost>.Filter.Eq(c => c.LegacyId, id);
+
+        var cost = await _costs.Find(filter).FirstOrDefaultAsync();
         if (cost == null) return NotFound(new { message = "Cost not found" });
 
         var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
         var legacyIdStr = User.FindFirst("legacy_id")?.Value;
         if (int.TryParse(legacyIdStr, out var currentUserId))
         {
-            var viewAllRoles = new[] { "admin", "director", "giam_doc", "manager", "ip_manager", "quan_ly", "accountant", "ke_toan", "marketing_sales", "sales" };
+            var viewAllRoles = new[] { "admin", "ceo", "assistant_ceo", "director", "giam_doc", "manager", "ip_manager", "quan_ly", "accountant", "ke_toan", "marketing_sales", "sales" };
             if (!viewAllRoles.Contains(userRole) && cost.CreatedByUserId != currentUserId)
             {
                 return StatusCode(403, new { message = "Bạn không có quyền xem phiếu này" });
@@ -259,26 +262,7 @@ public class CostsController : ControllerBase
         {
             input.Id = ObjectId.GenerateNewId().ToString();
             input.CompanyId = companyId;
-
-            Cost? maxLegacyId = null;
-            for (var attempt = 0; attempt < 3; attempt++)
-            {
-                try
-                {
-                    maxLegacyId = await _costs.Find(_ => true)
-                        .SortByDescending(c => c.LegacyId)
-                        .Limit(1)
-                        .FirstOrDefaultAsync();
-                    break;
-                }
-                catch
-                {
-                    if (attempt == 2) throw;
-                    await Task.Delay(300);
-                }
-            }
-
-            input.LegacyId = maxLegacyId != null ? maxLegacyId.LegacyId + 1 : 1;
+            input.LegacyId = await TenantContext.GetNextLegacyIdAsync(_db, companyId, "costs", HttpContext.RequestAborted);
             input.CreatedByUserId = userId;
             input.PaymentStatus = "Đợi duyệt";
 

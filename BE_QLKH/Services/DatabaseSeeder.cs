@@ -47,6 +47,217 @@ public class DatabaseSeeder : IHostedService
         await EnsureCollection("notifications");
         await EnsureCollection("companies");
         await EnsureCollection("user_companies");
+        await EnsureCollection("businesses");
+        await EnsureCollection("contracts");
+        await EnsureCollection("counters");
+        await EnsureCollection("projects");
+        await EnsureCollection("project_modules");
+        await EnsureCollection("project_tasks");
+        await EnsureCollection("project_task_activities");
+
+        async Task TryCreateIndex(string collectionName, CreateIndexModel<BsonDocument> model)
+        {
+            try
+            {
+                await db.GetCollection<BsonDocument>(collectionName).Indexes.CreateOneAsync(model, cancellationToken: cancellationToken);
+            }
+            catch
+            {
+            }
+        }
+
+        await TryCreateIndex(
+            "customers",
+            new CreateIndexModel<BsonDocument>(
+                Builders<BsonDocument>.IndexKeys.Ascending("company_id").Ascending("legacy_id"),
+                new CreateIndexOptions { Unique = true, Name = "ux_customers_company_legacy" }
+            )
+        );
+
+        await TryCreateIndex(
+            "customers",
+            new CreateIndexModel<BsonDocument>(
+                Builders<BsonDocument>.IndexKeys.Ascending("company_id").Ascending("tax_code"),
+                new CreateIndexOptions<BsonDocument>
+                {
+                    Unique = true,
+                    Name = "ux_customers_company_taxcode",
+                    PartialFilterExpression = Builders<BsonDocument>.Filter.And(
+                        Builders<BsonDocument>.Filter.Exists("tax_code", true),
+                        Builders<BsonDocument>.Filter.Ne("tax_code", ""),
+                        Builders<BsonDocument>.Filter.Ne("tax_code", BsonNull.Value)
+                    )
+                }
+            )
+        );
+
+        await TryCreateIndex(
+            "customers",
+            new CreateIndexModel<BsonDocument>(
+                Builders<BsonDocument>.IndexKeys.Ascending("company_id").Descending("updated_at"),
+                new CreateIndexOptions { Name = "ix_customers_company_updatedat" }
+            )
+        );
+
+        await TryCreateIndex(
+            "costs",
+            new CreateIndexModel<BsonDocument>(
+                Builders<BsonDocument>.IndexKeys.Ascending("company_id").Ascending("legacy_id"),
+                new CreateIndexOptions { Unique = true, Name = "ux_costs_company_legacy" }
+            )
+        );
+
+        await TryCreateIndex(
+            "businesses",
+            new CreateIndexModel<BsonDocument>(
+                Builders<BsonDocument>.IndexKeys.Ascending("company_id").Ascending("legacy_id"),
+                new CreateIndexOptions { Unique = true, Name = "ux_businesses_company_legacy" }
+            )
+        );
+
+        await TryCreateIndex(
+            "contracts",
+            new CreateIndexModel<BsonDocument>(
+                Builders<BsonDocument>.IndexKeys.Ascending("company_id").Ascending("legacy_id"),
+                new CreateIndexOptions { Unique = true, Name = "ux_contracts_company_legacy" }
+            )
+        );
+
+        await TryCreateIndex(
+            "user_companies",
+            new CreateIndexModel<BsonDocument>(
+                Builders<BsonDocument>.IndexKeys.Ascending("user_legacy_id").Ascending("company_id"),
+                new CreateIndexOptions { Unique = true, Name = "ux_user_companies_user_company" }
+            )
+        );
+
+        await TryCreateIndex(
+            "counters",
+            new CreateIndexModel<BsonDocument>(
+                Builders<BsonDocument>.IndexKeys.Ascending("company_id").Ascending("entity"),
+                new CreateIndexOptions { Unique = true, Name = "ux_counters_company_entity" }
+            )
+        );
+
+        await TryCreateIndex(
+            "projects",
+            new CreateIndexModel<BsonDocument>(
+                Builders<BsonDocument>.IndexKeys.Ascending("company_id").Ascending("legacy_id"),
+                new CreateIndexOptions { Unique = true, Name = "ux_projects_company_legacy" }
+            )
+        );
+
+        await TryCreateIndex(
+            "projects",
+            new CreateIndexModel<BsonDocument>(
+                Builders<BsonDocument>.IndexKeys.Ascending("company_id").Ascending("code"),
+                new CreateIndexOptions { Unique = true, Name = "ux_projects_company_code" }
+            )
+        );
+
+        await TryCreateIndex(
+            "project_modules",
+            new CreateIndexModel<BsonDocument>(
+                Builders<BsonDocument>.IndexKeys.Ascending("company_id").Ascending("legacy_id"),
+                new CreateIndexOptions { Unique = true, Name = "ux_project_modules_company_legacy" }
+            )
+        );
+
+        await TryCreateIndex(
+            "project_modules",
+            new CreateIndexModel<BsonDocument>(
+                Builders<BsonDocument>.IndexKeys.Ascending("company_id").Ascending("project_id").Ascending("status"),
+                new CreateIndexOptions { Name = "ix_project_modules_company_project_status" }
+            )
+        );
+
+        await TryCreateIndex(
+            "project_tasks",
+            new CreateIndexModel<BsonDocument>(
+                Builders<BsonDocument>.IndexKeys.Ascending("company_id").Ascending("legacy_id"),
+                new CreateIndexOptions { Unique = true, Name = "ux_project_tasks_company_legacy" }
+            )
+        );
+
+        await TryCreateIndex(
+            "project_tasks",
+            new CreateIndexModel<BsonDocument>(
+                Builders<BsonDocument>.IndexKeys.Ascending("company_id").Ascending("project_id").Ascending("module_id").Ascending("status"),
+                new CreateIndexOptions { Name = "ix_project_tasks_company_project_module_status" }
+            )
+        );
+
+        await TryCreateIndex(
+            "project_tasks",
+            new CreateIndexModel<BsonDocument>(
+                Builders<BsonDocument>.IndexKeys.Ascending("company_id").Ascending("assignee_user_id").Ascending("status"),
+                new CreateIndexOptions { Name = "ix_project_tasks_company_assignee_status" }
+            )
+        );
+
+        await TryCreateIndex(
+            "project_tasks",
+            new CreateIndexModel<BsonDocument>(
+                Builders<BsonDocument>.IndexKeys.Ascending("company_id").Ascending("end_date").Ascending("status"),
+                new CreateIndexOptions { Name = "ix_project_tasks_company_enddate_status" }
+            )
+        );
+
+        await TryCreateIndex(
+            "project_task_activities",
+            new CreateIndexModel<BsonDocument>(
+                Builders<BsonDocument>.IndexKeys.Ascending("company_id").Ascending("task_id").Descending("created_at"),
+                new CreateIndexOptions { Name = "ix_project_task_activities_company_task_createdat" }
+            )
+        );
+
+        async Task EnsureCounterFromCollection(string collectionName, string entity)
+        {
+            try
+            {
+                var coll = db.GetCollection<BsonDocument>(collectionName);
+                var counters = db.GetCollection<BsonDocument>("counters");
+
+                var pipeline = new[]
+                {
+                    new BsonDocument("$match", new BsonDocument("legacy_id", new BsonDocument("$type", "int"))),
+                    new BsonDocument("$group", new BsonDocument
+                    {
+                        { "_id", "$company_id" },
+                        { "maxLegacyId", new BsonDocument("$max", "$legacy_id") }
+                    })
+                };
+
+                var grouped = await coll.Aggregate<BsonDocument>(pipeline).ToListAsync(cancellationToken);
+                foreach (var g in grouped)
+                {
+                    if (!g.TryGetValue("_id", out var companyVal)) continue;
+                    if (companyVal == BsonNull.Value) continue;
+                    var maxLegacy = g.GetValue("maxLegacyId", 0).ToInt32();
+                    if (maxLegacy <= 0) continue;
+
+                    var filter = Builders<BsonDocument>.Filter.Eq("entity", entity) &
+                                 Builders<BsonDocument>.Filter.Eq("company_id", companyVal);
+                    var update = Builders<BsonDocument>.Update
+                        .SetOnInsert("entity", entity)
+                        .SetOnInsert("company_id", companyVal)
+                        .Max("seq", maxLegacy);
+
+                    await counters.UpdateOneAsync(filter, update, new UpdateOptions { IsUpsert = true }, cancellationToken);
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        await EnsureCounterFromCollection("customers", "customers");
+        await EnsureCounterFromCollection("costs", "costs");
+        await EnsureCounterFromCollection("businesses", "businesses");
+        await EnsureCounterFromCollection("contracts", "contracts");
+        await EnsureCounterFromCollection("projects", "projects");
+        await EnsureCounterFromCollection("project_modules", "project_modules");
+        await EnsureCounterFromCollection("project_tasks", "project_tasks");
 
         var now = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
 
@@ -55,6 +266,7 @@ public class DatabaseSeeder : IHostedService
         {
             var defaultCompanies = new List<Company>
             {
+                new Company { Id = ObjectId.GenerateNewId().ToString(), Code = "SHTT", Name = "Sở hữu trí tuệ (SHTT)", Status = "active", CreatedAt = now, UpdatedAt = now, CreatedBy = 0, UpdatedBy = 0 },
                 new Company { Id = ObjectId.GenerateNewId().ToString(), Code = "CTYA", Name = "Công ty A", Status = "active", CreatedAt = now, UpdatedAt = now, CreatedBy = 0, UpdatedBy = 0 },
                 new Company { Id = ObjectId.GenerateNewId().ToString(), Code = "CTYB", Name = "Công ty B", Status = "active", CreatedAt = now, UpdatedAt = now, CreatedBy = 0, UpdatedBy = 0 },
                 new Company { Id = ObjectId.GenerateNewId().ToString(), Code = "CTYC", Name = "Công ty C", Status = "active", CreatedAt = now, UpdatedAt = now, CreatedBy = 0, UpdatedBy = 0 }
@@ -62,8 +274,27 @@ public class DatabaseSeeder : IHostedService
 
             await companiesCollection.InsertManyAsync(defaultCompanies, cancellationToken: cancellationToken);
         }
+        else
+        {
+            var hasShtt = await companiesCollection.Find(c => c.Code == "SHTT").AnyAsync(cancellationToken);
+            if (!hasShtt)
+            {
+                await companiesCollection.InsertOneAsync(new Company
+                {
+                    Id = ObjectId.GenerateNewId().ToString(),
+                    Code = "SHTT",
+                    Name = "Sở hữu trí tuệ (SHTT)",
+                    Status = "active",
+                    CreatedAt = now,
+                    UpdatedAt = now,
+                    CreatedBy = 0,
+                    UpdatedBy = 0
+                }, null, cancellationToken);
+            }
+        }
 
-        var defaultCompany = await companiesCollection.Find(c => c.Code == "CTYA").FirstOrDefaultAsync(cancellationToken) ??
+        var defaultCompany = await companiesCollection.Find(c => c.Code == "SHTT").FirstOrDefaultAsync(cancellationToken) ??
+                             await companiesCollection.Find(c => c.Code == "CTYA").FirstOrDefaultAsync(cancellationToken) ??
                              await companiesCollection.Find(_ => true).SortBy(c => c.Code).FirstOrDefaultAsync(cancellationToken);
 
         var defaultCompanyId = defaultCompany?.Id ?? string.Empty;
@@ -1080,9 +1311,9 @@ public class DatabaseSeeder : IHostedService
             new Role { Code = "accountant", Name = "Kế toán", IsActive = true },
             new Role { Code = "director", Name = "Giám đốc", IsActive = true },
             new Role { Code = "ceo", Name = "Tổng giám đốc", IsActive = true },
-            new Role { Code = "assistant_ceo", Name = "Trợ lý TGĐ", IsActive = true },
+            new Role { Code = "assistant_ceo", Name = "Trợ lý Tổng giám đốc", IsActive = true },
             new Role { Code = "hr", Name = "Nhân sự", IsActive = true },
-            new Role { Code = "assistant_director", Name = "Trợ lý GĐ", IsActive = true },
+            new Role { Code = "assistant_director", Name = "Trợ lý Giám đốc", IsActive = true },
             new Role { Code = "admin", Name = "Admin", IsActive = true }
         };
 
@@ -1099,6 +1330,25 @@ public class DatabaseSeeder : IHostedService
                 existing.Name = r.Name;
                 existing.IsActive = r.IsActive;
                 await rolesCollection.ReplaceOneAsync(x => x.Id == existing.Id, existing, cancellationToken: cancellationToken);
+            }
+        }
+
+        var allExistingRoles = await rolesCollection.Find(_ => true).ToListAsync(cancellationToken);
+        var duplicates = allExistingRoles
+            .Where(r => !string.IsNullOrWhiteSpace(r.Code))
+            .GroupBy(r => r.Code!.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Where(g => g.Count() > 1)
+            .ToList();
+
+        foreach (var g in duplicates)
+        {
+            var keep = g.First();
+            foreach (var extra in g.Skip(1))
+            {
+                if (!string.IsNullOrWhiteSpace(extra.Id))
+                {
+                    await rolesCollection.DeleteOneAsync(x => x.Id == extra.Id, cancellationToken);
+                }
             }
         }
 
@@ -1773,6 +2023,12 @@ public class DatabaseSeeder : IHostedService
             await db.GetCollection<BsonDocument>("audit_logs").UpdateManyAsync(missingCompanyFilter, setDefaultCompany, cancellationToken: cancellationToken);
             await db.GetCollection<BsonDocument>("project_codes").UpdateManyAsync(missingCompanyFilter, setDefaultCompany, cancellationToken: cancellationToken);
             await db.GetCollection<BsonDocument>("notifications").UpdateManyAsync(missingCompanyFilter, setDefaultCompany, cancellationToken: cancellationToken);
+            await db.GetCollection<BsonDocument>("businesses").UpdateManyAsync(missingCompanyFilter, setDefaultCompany, cancellationToken: cancellationToken);
+            await db.GetCollection<BsonDocument>("contracts").UpdateManyAsync(missingCompanyFilter, setDefaultCompany, cancellationToken: cancellationToken);
+            await db.GetCollection<BsonDocument>("projects").UpdateManyAsync(missingCompanyFilter, setDefaultCompany, cancellationToken: cancellationToken);
+            await db.GetCollection<BsonDocument>("project_modules").UpdateManyAsync(missingCompanyFilter, setDefaultCompany, cancellationToken: cancellationToken);
+            await db.GetCollection<BsonDocument>("project_tasks").UpdateManyAsync(missingCompanyFilter, setDefaultCompany, cancellationToken: cancellationToken);
+            await db.GetCollection<BsonDocument>("project_task_activities").UpdateManyAsync(missingCompanyFilter, setDefaultCompany, cancellationToken: cancellationToken);
 
             var usersMissingCompanyFilter = Builders<BsonDocument>.Filter.Or(
                 Builders<BsonDocument>.Filter.Exists("company_id", false),
@@ -1801,11 +2057,26 @@ public class DatabaseSeeder : IHostedService
                     Id = ObjectId.GenerateNewId().ToString(),
                     UserLegacyId = u.LegacyId,
                     CompanyId = u.CompanyId,
+                    RoleCode = string.IsNullOrWhiteSpace(u.RoleCode) ? null : u.RoleCode,
                     IsDefault = true,
                     CreatedAt = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
                 };
 
                 await userCompanies.InsertOneAsync(doc, cancellationToken: cancellationToken);
+            }
+
+            var existingMappings = await userCompanies.Find(_ => true).ToListAsync(cancellationToken);
+            var userRoleMap = usersForMapping
+                .GroupBy(x => x.LegacyId)
+                .ToDictionary(g => g.Key, g => g.First().RoleCode);
+
+            foreach (var m in existingMappings)
+            {
+                if (!string.IsNullOrWhiteSpace(m.RoleCode)) continue;
+                if (!userRoleMap.TryGetValue(m.UserLegacyId, out var roleCode) || string.IsNullOrWhiteSpace(roleCode)) continue;
+
+                var update = Builders<UserCompany>.Update.Set(x => x.RoleCode, roleCode);
+                await userCompanies.UpdateOneAsync(x => x.Id == m.Id, update, cancellationToken: cancellationToken);
             }
         }
 
@@ -1972,6 +2243,280 @@ public class DatabaseSeeder : IHostedService
             }
         }
 
+        {
+            var companiesCollection2 = db.GetCollection<Company>("companies");
+            var projectsCollection = db.GetCollection<Project>("projects");
+            var modulesCollection2 = db.GetCollection<ProjectModule>("project_modules");
+            var tasksCollection2 = db.GetCollection<ProjectTask>("project_tasks");
+            var activitiesCollection = db.GetCollection<ProjectTaskActivity>("project_task_activities");
+            var countersCollection = db.GetCollection<BsonDocument>("counters");
+
+            async Task<int> NextSeq(string companyId, string entity)
+            {
+                var companyValue = ObjectId.TryParse(companyId, out var oid) ? (BsonValue)oid : companyId;
+                var companyFilter = ObjectId.TryParse(companyId, out var companyOid)
+                    ? Builders<BsonDocument>.Filter.Or(
+                        Builders<BsonDocument>.Filter.Eq("company_id", companyOid),
+                        Builders<BsonDocument>.Filter.Eq("company_id", companyId)
+                    )
+                    : Builders<BsonDocument>.Filter.Eq("company_id", companyId);
+
+                var filter = Builders<BsonDocument>.Filter.Eq("entity", entity) & companyFilter;
+                var update = Builders<BsonDocument>.Update
+                    .Inc("seq", 1)
+                    .SetOnInsert("entity", entity)
+                    .SetOnInsert("company_id", companyValue);
+
+                var options = new FindOneAndUpdateOptions<BsonDocument>
+                {
+                    IsUpsert = true,
+                    ReturnDocument = ReturnDocument.After
+                };
+
+                var doc = await countersCollection.FindOneAndUpdateAsync(filter, update, options, cancellationToken);
+                return doc.GetValue("seq", 0).ToInt32();
+            }
+
+            var activeCompanies = await companiesCollection2.Find(c => c.Status == "active").ToListAsync(cancellationToken);
+            if (activeCompanies.Count > 0)
+            {
+                var random = new Random();
+                var statusPool = new[] { "NOT_STARTED", "IN_PROGRESS", "IN_REVIEW", "DONE", "PAUSED", "CANCELLED" };
+                var priorityPool = new[] { "LOW", "MEDIUM", "HIGH", "URGENT" };
+
+                foreach (var comp in activeCompanies)
+                {
+                    var companyId = comp.Id;
+                    if (string.IsNullOrWhiteSpace(companyId)) continue;
+
+                    var hasSeedProject = await projectsCollection
+                        .Find(TenantContext.CompanyFilter<Project>(companyId) & Builders<Project>.Filter.Regex(p => p.Code, new BsonRegularExpression("^PRJ-SEED-", "i")))
+                        .AnyAsync(cancellationToken);
+                    if (hasSeedProject) continue;
+
+                    var usersForCompany = await usersCollection.Find(u => u.CompanyId == companyId && u.Status == "active").ToListAsync(cancellationToken);
+                    if (usersForCompany.Count == 0)
+                    {
+                        usersForCompany = await usersCollection.Find(u => u.Status == "active").Limit(10).ToListAsync(cancellationToken);
+                    }
+                    var managerIds = usersForCompany.Select(u => u.LegacyId).Where(x => x > 0).Distinct().ToList();
+                    var managerId = managerIds.Count > 0 ? managerIds[0] : 1;
+
+                    var customersForCompany = await customersCollection.Find(c => c.CompanyId == companyId).SortByDescending(c => c.LegacyId).Limit(20).ToListAsync(cancellationToken);
+                    var customer = customersForCompany.FirstOrDefault();
+
+                    var projectCount = string.Equals(comp.Code, "SHTT", StringComparison.OrdinalIgnoreCase) ? 2 : 1;
+
+                    for (var projectIndex = 1; projectIndex <= projectCount; projectIndex++)
+                    {
+                        var now2 = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
+                        var projLegacyId = await NextSeq(companyId, "projects");
+                        var code = projectCount == 1 && !string.IsNullOrWhiteSpace(comp.Code) && !string.Equals(comp.Code, "SHTT", StringComparison.OrdinalIgnoreCase)
+                            ? $"PRJ-SEED-{comp.Code}-{projectIndex:00}"
+                            : $"PRJ-SEED-{projectIndex:00}";
+
+                        var project = new Project
+                        {
+                            Id = ObjectId.GenerateNewId().ToString(),
+                            CompanyId = companyId,
+                            LegacyId = projLegacyId,
+                            Code = code,
+                            Name = string.IsNullOrWhiteSpace(comp.Code) ? $"Dự án mẫu #{projectIndex}" : $"Dự án mẫu {comp.Code} #{projectIndex}",
+                            CustomerLegacyId = customer?.LegacyId,
+                            CustomerName = customer?.Name,
+                            StartDate = $"2026-0{Math.Min(9, projectIndex)}-01",
+                            EndDate = $"2026-0{Math.Min(9, projectIndex)}-28",
+                            ManagerUserId = managerId,
+                            Status = "IN_PROGRESS",
+                            Progress = 0,
+                            Description = "Dữ liệu mẫu quản lý dự án",
+                            Budget = 200000000m + (projectIndex * 50000000m),
+                            ModuleCount = 0,
+                            TaskCount = 0,
+                            TaskDoneCount = 0,
+                            WeightedProgressSum = 0,
+                            WeightSum = 0,
+                            CreatedAt = now2,
+                            CreatedBy = managerId,
+                            UpdatedAt = now2,
+                            UpdatedBy = managerId
+                        };
+
+                        await projectsCollection.InsertOneAsync(project, null, cancellationToken);
+
+                        var moduleIds = new List<string>();
+                        var moduleLegacyIds = new List<int>();
+
+                        for (var moduleIndex = 1; moduleIndex <= 3; moduleIndex++)
+                        {
+                            var modLegacyId = await NextSeq(companyId, "project_modules");
+                            var module = new ProjectModule
+                            {
+                                Id = ObjectId.GenerateNewId().ToString(),
+                                CompanyId = companyId,
+                                LegacyId = modLegacyId,
+                                ProjectId = project.Id,
+                                ProjectLegacyId = project.LegacyId,
+                                Name = $"Module {moduleIndex}",
+                                OwnerUserId = managerId,
+                                StartDate = project.StartDate,
+                                EndDate = project.EndDate,
+                                Status = "IN_PROGRESS",
+                                Progress = 0,
+                                Priority = priorityPool[random.Next(priorityPool.Length)],
+                                Description = "Module mẫu",
+                                TaskCount = 0,
+                                TaskDoneCount = 0,
+                                WeightedProgressSum = 0,
+                                WeightSum = 0,
+                                CreatedAt = now2,
+                                CreatedBy = managerId,
+                                UpdatedAt = now2,
+                                UpdatedBy = managerId
+                            };
+
+                            await modulesCollection2.InsertOneAsync(module, null, cancellationToken);
+                            moduleIds.Add(module.Id);
+                            moduleLegacyIds.Add(module.LegacyId);
+                        }
+
+                        var allTasks = new List<ProjectTask>();
+                        var allActivities = new List<ProjectTaskActivity>();
+
+                        for (var i = 0; i < 12; i++)
+                        {
+                            var modulePos = i % moduleIds.Count;
+                            var moduleId = moduleIds[modulePos];
+                            var moduleLegacyId = moduleLegacyIds[modulePos];
+
+                            var status = statusPool[random.Next(statusPool.Length)];
+                            var progress = status switch
+                            {
+                                "NOT_STARTED" => 0,
+                                "DONE" => 100,
+                                "CANCELLED" => 0,
+                                "PAUSED" => 30,
+                                "IN_REVIEW" => random.Next(80, 96),
+                                _ => random.Next(10, 81)
+                            };
+
+                            var estimated = new[] { 60, 120, 180, 240 }[random.Next(4)];
+                            var endDate = i % 7 == 0 ? "2026-01-10" : $"2026-0{Math.Min(9, projectIndex)}-{random.Next(5, 28):00}";
+                            var overdue = status is not ("DONE" or "CANCELLED") && DateTime.TryParse(endDate, out var ed) && ed.Date < DateTime.UtcNow.Date;
+
+                            var taskLegacyId = await NextSeq(companyId, "project_tasks");
+                            var assignee = managerIds.Count > 0 ? managerIds[random.Next(managerIds.Count)] : managerId;
+
+                            var task = new ProjectTask
+                            {
+                                Id = ObjectId.GenerateNewId().ToString(),
+                                CompanyId = companyId,
+                                LegacyId = taskLegacyId,
+                                ProjectId = project.Id,
+                                ProjectLegacyId = project.LegacyId,
+                                ModuleId = moduleId,
+                                ModuleLegacyId = moduleLegacyId,
+                                Name = $"Task #{i + 1}",
+                                AssigneeUserId = assignee,
+                                AssignerUserId = managerId,
+                                Status = status,
+                                Priority = priorityPool[random.Next(priorityPool.Length)],
+                                Progress = progress,
+                                Description = "Công việc mẫu",
+                                Notes = "",
+                                StartDate = project.StartDate,
+                                EndDate = endDate,
+                                Tags = new List<string> { "seed", "project" },
+                                EstimatedMinutes = estimated,
+                                ActualMinutes = status == "DONE" ? estimated : null,
+                                DeadlineOverdue = overdue,
+                                Attachments = new List<ProjectTaskAttachment>
+                                {
+                                    new ProjectTaskAttachment { Type = "url", Name = "Spec", Url = "https://example.com/spec" }
+                                },
+                                CreatedAt = now2,
+                                CreatedBy = managerId,
+                                UpdatedAt = now2,
+                                UpdatedBy = managerId
+                            };
+
+                            allTasks.Add(task);
+
+                            allActivities.Add(new ProjectTaskActivity
+                            {
+                                Id = ObjectId.GenerateNewId().ToString(),
+                                CompanyId = companyId,
+                                TaskId = task.Id,
+                                TaskLegacyId = task.LegacyId,
+                                ActorUserId = managerId,
+                                Type = "created",
+                                Message = "Tạo task",
+                                CreatedAt = now2
+                            });
+
+                            allActivities.Add(new ProjectTaskActivity
+                            {
+                                Id = ObjectId.GenerateNewId().ToString(),
+                                CompanyId = companyId,
+                                TaskId = task.Id,
+                                TaskLegacyId = task.LegacyId,
+                                ActorUserId = assignee,
+                                Type = "comment",
+                                Message = "Đã nhận task và đang triển khai",
+                                CreatedAt = now2
+                            });
+                        }
+
+                        await tasksCollection2.InsertManyAsync(allTasks, cancellationToken: cancellationToken);
+                        await activitiesCollection.InsertManyAsync(allActivities, cancellationToken: cancellationToken);
+
+                        var tasksByModule = allTasks.GroupBy(t => t.ModuleId).ToDictionary(g => g.Key, g => g.ToList());
+                        foreach (var kv in tasksByModule)
+                        {
+                            var moduleId = kv.Key;
+                            var tasks = kv.Value;
+                            var taskCount = tasks.Count;
+                            var doneCount = tasks.Count(t => t.Status == "DONE");
+                            var weightSum = tasks.Sum(t => Math.Max(1, t.EstimatedMinutes ?? 1));
+                            var weightedSum = tasks.Sum(t => Math.Max(1, t.EstimatedMinutes ?? 1) * Math.Clamp(t.Progress, 0, 100));
+                            var progress2 = weightSum > 0 ? (int)Math.Round(weightedSum * 1.0 / weightSum) : 0;
+
+                            var update = Builders<ProjectModule>.Update
+                                .Set(m => m.TaskCount, taskCount)
+                                .Set(m => m.TaskDoneCount, doneCount)
+                                .Set(m => m.WeightSum, weightSum)
+                                .Set(m => m.WeightedProgressSum, weightedSum)
+                                .Set(m => m.Progress, Math.Clamp(progress2, 0, 100))
+                                .Set(m => m.UpdatedAt, now2)
+                                .Set(m => m.UpdatedBy, managerId);
+
+                            await modulesCollection2.UpdateOneAsync(x => x.Id == moduleId, update, cancellationToken: cancellationToken);
+                        }
+
+                        var pTaskCount = allTasks.Count;
+                        var pDoneCount = allTasks.Count(t => t.Status == "DONE");
+                        var pWeightSum = allTasks.Sum(t => Math.Max(1, t.EstimatedMinutes ?? 1));
+                        var pWeightedSum = allTasks.Sum(t => Math.Max(1, t.EstimatedMinutes ?? 1) * Math.Clamp(t.Progress, 0, 100));
+                        var pProgress = pWeightSum > 0 ? (int)Math.Round(pWeightedSum * 1.0 / pWeightSum) : 0;
+
+                        var pUpdate = Builders<Project>.Update
+                            .Set(p => p.ModuleCount, moduleIds.Count)
+                            .Set(p => p.TaskCount, pTaskCount)
+                            .Set(p => p.TaskDoneCount, pDoneCount)
+                            .Set(p => p.WeightSum, pWeightSum)
+                            .Set(p => p.WeightedProgressSum, pWeightedSum)
+                            .Set(p => p.Progress, Math.Clamp(pProgress, 0, 100))
+                            .Set(p => p.UpdatedAt, now2)
+                            .Set(p => p.UpdatedBy, managerId);
+
+                        await projectsCollection.UpdateOneAsync(x => x.Id == project.Id, pUpdate, cancellationToken: cancellationToken);
+                    }
+
+                    Console.WriteLine($"Seeded sample project management data for company {comp.Code}");
+                }
+            }
+        }
+
         // ---------------------------------------------------------
         // Ensure Scheduling Module Fields and Permissions Exist
         // ---------------------------------------------------------
@@ -2026,6 +2571,150 @@ public class DatabaseSeeder : IHostedService
                      cancellationToken
                  );
              }
+        }
+
+        var permissionRoles = new[] { "marketing_sales", "ip_executive", "ip_manager", "accountant", "director", "ceo", "assistant_ceo", "assistant_director", "hr", "admin" };
+
+        var companyFields = new List<FieldDef>
+        {
+            new FieldDef { ModuleCode = "companies", Code = "view", Label = "Xem danh sách công ty", GroupCode = "view", GroupLabel = "Xem", OrderIndex = 1 },
+            new FieldDef { ModuleCode = "companies", Code = "manage", Label = "Thêm/Sửa/Xóa công ty", GroupCode = "actions", GroupLabel = "Chức năng", OrderIndex = 2 }
+        };
+
+        foreach (var field in companyFields)
+        {
+            var existingField = await fieldsCollection.Find(f => f.ModuleCode == field.ModuleCode && f.Code == field.Code).FirstOrDefaultAsync(cancellationToken);
+            if (existingField == null)
+            {
+                field.Id = ObjectId.GenerateNewId().ToString();
+                await fieldsCollection.InsertOneAsync(field, cancellationToken: cancellationToken);
+            }
+        }
+
+        foreach (var roleCode in permissionRoles)
+        {
+            var viewLevel = (roleCode == "admin" || roleCode == "ceo" || roleCode == "assistant_ceo") ? "R" : "N";
+            var manageLevel = (roleCode == "admin" || roleCode == "ceo") ? "A" : (roleCode == "assistant_ceo" ? "W" : "N");
+
+            await fpCollection.UpdateOneAsync(
+                p => p.ModuleCode == "companies" && p.FieldCode == "view" && p.RoleCode == roleCode,
+                Builders<FieldPermission>.Update.Set(p => p.PermissionLevel, viewLevel),
+                new UpdateOptions { IsUpsert = true },
+                cancellationToken
+            );
+
+            await fpCollection.UpdateOneAsync(
+                p => p.ModuleCode == "companies" && p.FieldCode == "manage" && p.RoleCode == roleCode,
+                Builders<FieldPermission>.Update.Set(p => p.PermissionLevel, manageLevel),
+                new UpdateOptions { IsUpsert = true },
+                cancellationToken
+            );
+        }
+
+        var projectFields = new List<FieldDef>
+        {
+            new FieldDef { ModuleCode = "projects", Code = "view", Label = "Xem danh sách/chi tiết dự án", GroupCode = "view", GroupLabel = "Xem", OrderIndex = 1 },
+            new FieldDef { ModuleCode = "projects", Code = "manage", Label = "Thêm/Sửa/Xóa dự án", GroupCode = "actions", GroupLabel = "Chức năng", OrderIndex = 2 },
+            new FieldDef { ModuleCode = "projects", Code = "manageModules", Label = "Quản lý module", GroupCode = "actions", GroupLabel = "Chức năng", OrderIndex = 3 },
+            new FieldDef { ModuleCode = "projects", Code = "manageTasks", Label = "Quản lý task", GroupCode = "actions", GroupLabel = "Chức năng", OrderIndex = 4 }
+        };
+
+        foreach (var field in projectFields)
+        {
+            var existingField = await fieldsCollection.Find(f => f.ModuleCode == field.ModuleCode && f.Code == field.Code).FirstOrDefaultAsync(cancellationToken);
+            if (existingField == null)
+            {
+                field.Id = ObjectId.GenerateNewId().ToString();
+                await fieldsCollection.InsertOneAsync(field, cancellationToken: cancellationToken);
+            }
+        }
+
+        foreach (var roleCode in permissionRoles)
+        {
+            var viewLevel = (roleCode == "admin" || roleCode == "ceo" || roleCode == "assistant_ceo" || roleCode == "director" || roleCode == "assistant_director" || roleCode == "ip_manager" || roleCode == "ip_executive" || roleCode == "marketing_sales" || roleCode == "accountant" || roleCode == "hr") ? "R" : "N";
+
+            var manageLevel = (roleCode == "admin" || roleCode == "ceo") ? "A"
+                : (roleCode == "director" || roleCode == "ip_manager") ? "W"
+                : (roleCode == "assistant_ceo" || roleCode == "assistant_director") ? "W"
+                : "N";
+
+            var manageModulesLevel = (roleCode == "admin" || roleCode == "ceo") ? "A"
+                : (roleCode == "director" || roleCode == "ip_manager") ? "W"
+                : (roleCode == "assistant_ceo" || roleCode == "assistant_director") ? "W"
+                : "N";
+
+            var manageTasksLevel = (roleCode == "admin" || roleCode == "ceo") ? "A"
+                : (roleCode == "director" || roleCode == "ip_manager") ? "W"
+                : (roleCode == "assistant_ceo" || roleCode == "assistant_director") ? "W"
+                : "R";
+
+            await fpCollection.UpdateOneAsync(
+                p => p.ModuleCode == "projects" && p.FieldCode == "view" && p.RoleCode == roleCode,
+                Builders<FieldPermission>.Update.Set(p => p.PermissionLevel, viewLevel),
+                new UpdateOptions { IsUpsert = true },
+                cancellationToken
+            );
+            await fpCollection.UpdateOneAsync(
+                p => p.ModuleCode == "projects" && p.FieldCode == "manage" && p.RoleCode == roleCode,
+                Builders<FieldPermission>.Update.Set(p => p.PermissionLevel, manageLevel),
+                new UpdateOptions { IsUpsert = true },
+                cancellationToken
+            );
+            await fpCollection.UpdateOneAsync(
+                p => p.ModuleCode == "projects" && p.FieldCode == "manageModules" && p.RoleCode == roleCode,
+                Builders<FieldPermission>.Update.Set(p => p.PermissionLevel, manageModulesLevel),
+                new UpdateOptions { IsUpsert = true },
+                cancellationToken
+            );
+            await fpCollection.UpdateOneAsync(
+                p => p.ModuleCode == "projects" && p.FieldCode == "manageTasks" && p.RoleCode == roleCode,
+                Builders<FieldPermission>.Update.Set(p => p.PermissionLevel, manageTasksLevel),
+                new UpdateOptions { IsUpsert = true },
+                cancellationToken
+            );
+        }
+
+        var workDashboardFields = new List<FieldDef>
+        {
+            new FieldDef { ModuleCode = "work_dashboard", Code = "view", Label = "Xem dashboard công việc", GroupCode = "view", GroupLabel = "Xem", OrderIndex = 1 },
+            new FieldDef { ModuleCode = "work_dashboard", Code = "viewTeam", Label = "Xem theo nhân viên", GroupCode = "view", GroupLabel = "Xem", OrderIndex = 2 },
+            new FieldDef { ModuleCode = "work_dashboard", Code = "viewAllCompanies", Label = "Xem tổng nhiều công ty", GroupCode = "view", GroupLabel = "Xem", OrderIndex = 3 }
+        };
+
+        foreach (var field in workDashboardFields)
+        {
+            var existingField = await fieldsCollection.Find(f => f.ModuleCode == field.ModuleCode && f.Code == field.Code).FirstOrDefaultAsync(cancellationToken);
+            if (existingField == null)
+            {
+                field.Id = ObjectId.GenerateNewId().ToString();
+                await fieldsCollection.InsertOneAsync(field, cancellationToken: cancellationToken);
+            }
+        }
+
+        foreach (var roleCode in permissionRoles)
+        {
+            var viewLevel = "R";
+            var viewTeamLevel = (roleCode == "admin" || roleCode == "ceo" || roleCode == "assistant_ceo" || roleCode == "director" || roleCode == "assistant_director" || roleCode == "ip_manager") ? "R" : "N";
+            var viewAllCompaniesLevel = (roleCode == "admin" || roleCode == "ceo" || roleCode == "assistant_ceo") ? "R" : "N";
+
+            await fpCollection.UpdateOneAsync(
+                p => p.ModuleCode == "work_dashboard" && p.FieldCode == "view" && p.RoleCode == roleCode,
+                Builders<FieldPermission>.Update.Set(p => p.PermissionLevel, viewLevel),
+                new UpdateOptions { IsUpsert = true },
+                cancellationToken
+            );
+            await fpCollection.UpdateOneAsync(
+                p => p.ModuleCode == "work_dashboard" && p.FieldCode == "viewTeam" && p.RoleCode == roleCode,
+                Builders<FieldPermission>.Update.Set(p => p.PermissionLevel, viewTeamLevel),
+                new UpdateOptions { IsUpsert = true },
+                cancellationToken
+            );
+            await fpCollection.UpdateOneAsync(
+                p => p.ModuleCode == "work_dashboard" && p.FieldCode == "viewAllCompanies" && p.RoleCode == roleCode,
+                Builders<FieldPermission>.Update.Set(p => p.PermissionLevel, viewAllCompaniesLevel),
+                new UpdateOptions { IsUpsert = true },
+                cancellationToken
+            );
         }
 
             // Ensure manager email is updated (Fix for existing data)

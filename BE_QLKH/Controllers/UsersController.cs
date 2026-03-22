@@ -1,10 +1,12 @@
 using BE_QLKH.Models;
+using BE_QLKH.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Driver;
+using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -27,6 +29,27 @@ public class UsersController : ControllerBase
         _userCompanies = db.GetCollection<UserCompany>("user_companies");
     }
 
+    private static string GetRole(ClaimsPrincipal user) => user.FindFirst(ClaimTypes.Role)?.Value ?? string.Empty;
+
+    private int GetActorLegacyId()
+    {
+        var legacyIdStr = User.FindFirst("legacy_id")?.Value;
+        return int.TryParse(legacyIdStr, out var legacyId) ? legacyId : 0;
+    }
+
+    private static bool CanViewAllCompanies(string role)
+    {
+        return string.Equals(role, "admin", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(role, "ceo", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(role, "assistant_ceo", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool CanViewCompanyUsers(string role)
+    {
+        var roles = new[] { "admin", "ceo", "assistant_ceo", "director", "giam_doc", "assistant_director", "ip_manager", "manager", "quan_ly", "hr" };
+        return roles.Contains(role);
+    }
+
     [HttpGet]
     public async Task<ActionResult<object>> GetUsers(
         [FromQuery] string? search, 
@@ -38,8 +61,25 @@ public class UsersController : ControllerBase
         const int pageSize = 10;
         var skip = (page - 1) * pageSize;
 
+        var role = GetRole(User);
+        var actorLegacyId = GetActorLegacyId();
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
+
         var builder = Builders<User>.Filter;
         var filter = builder.Empty;
+
+        if (CanViewAllCompanies(role))
+        {
+        }
+        else if (CanViewCompanyUsers(role))
+        {
+            filter &= builder.Eq(u => u.CompanyId, companyId);
+        }
+        else
+        {
+            if (actorLegacyId <= 0) return StatusCode(403, new { message = "Bạn không có quyền" });
+            filter &= builder.Eq(u => u.LegacyId, actorLegacyId);
+        }
 
         // Global Search
         if (!string.IsNullOrWhiteSpace(search))
@@ -192,8 +232,22 @@ public class UsersController : ControllerBase
     [HttpGet("{id:int}")]
     public async Task<ActionResult<object>> GetUserByLegacyId(int id)
     {
+        var role = GetRole(User);
+        var actorLegacyId = GetActorLegacyId();
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
+
+        if (!CanViewAllCompanies(role) && !CanViewCompanyUsers(role))
+        {
+            if (actorLegacyId <= 0 || actorLegacyId != id) return StatusCode(403, new { message = "Bạn không có quyền" });
+        }
+
         var user = await _users.Find(u => u.LegacyId == id).FirstOrDefaultAsync();
         if (user == null) return NotFound(new { message = "User not found" });
+
+        if (!CanViewAllCompanies(role) && CanViewCompanyUsers(role) && user.CompanyId != companyId)
+        {
+            return StatusCode(403, new { message = "Bạn không có quyền" });
+        }
 
         return Ok(new
         {
@@ -250,6 +304,11 @@ public class UsersController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<object>> CreateUser([FromBody] User input)
     {
+        if (!CanManageUsersCompanies())
+        {
+            return StatusCode(403, new { message = "Bạn không có quyền" });
+        }
+
         var companyId = BE_QLKH.Services.TenantContext.GetCompanyIdOrThrow(User);
         var now = DateTime.UtcNow.ToString("yyyy-MM-dd");
 
@@ -288,6 +347,7 @@ public class UsersController : ControllerBase
                     Id = ObjectId.GenerateNewId().ToString(),
                     UserLegacyId = input.LegacyId,
                     CompanyId = input.CompanyId,
+                    RoleCode = string.IsNullOrWhiteSpace(input.RoleCode) ? null : input.RoleCode,
                     IsDefault = true,
                     CreatedAt = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
                 });
@@ -349,6 +409,11 @@ public class UsersController : ControllerBase
     [HttpPut("{id:int}")]
     public async Task<ActionResult<object>> UpdateUser(int id, [FromBody] User input)
     {
+        if (!CanManageUsersCompanies())
+        {
+            return StatusCode(403, new { message = "Bạn không có quyền" });
+        }
+
         var user = await _users.Find(u => u.LegacyId == id).FirstOrDefaultAsync();
         if (user == null) return NotFound(new { message = "User not found" });
 
@@ -454,6 +519,7 @@ public class UsersController : ControllerBase
             Id = ObjectId.GenerateNewId().ToString(),
             UserLegacyId = id,
             CompanyId = company.Id,
+            RoleCode = string.IsNullOrWhiteSpace(user.RoleCode) ? null : user.RoleCode,
             IsDefault = true,
             CreatedAt = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
         });
@@ -503,6 +569,7 @@ public class UsersController : ControllerBase
             Id = ObjectId.GenerateNewId().ToString(),
             UserLegacyId = id,
             CompanyId = cid,
+            RoleCode = string.IsNullOrWhiteSpace(user.RoleCode) ? null : user.RoleCode,
             IsDefault = cid == defaultCompanyId,
             CreatedAt = now
         }).ToList());
@@ -537,6 +604,11 @@ public class UsersController : ControllerBase
     [HttpDelete("{id:int}")]
     public async Task<ActionResult<object>> DeleteUser(int id)
     {
+        if (!CanManageUsersCompanies())
+        {
+            return StatusCode(403, new { message = "Bạn không có quyền" });
+        }
+
         var result = await _users.DeleteOneAsync(u => u.LegacyId == id);
         if (result.DeletedCount == 0) return NotFound(new { message = "User not found" });
         return Ok(new { message = "User deleted" });

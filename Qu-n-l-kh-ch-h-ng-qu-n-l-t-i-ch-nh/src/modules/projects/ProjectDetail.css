@@ -1,0 +1,33 @@
+.project-detail-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.project-detail-header {
+  border-radius: 12px;
+}
+
+.project-detail-header-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.project-detail-header-progress {
+  min-width: 280px;
+}
+
+.project-detail-kpi {
+  border-radius: 10px;
+}
+
+.kanban-col .ant-card-body {
+  padding: 12px;
+}
+
+.team-row-selected td {
+  background: #e6f4ff !important;
+}
+

@@ -16,10 +16,12 @@ public class UserCompany
     [BsonRepresentation(BsonType.ObjectId)]
     public string CompanyId { get; set; } = string.Empty;
 
+    [BsonElement("role_code")]
+    public string? RoleCode { get; set; }
+
     [BsonElement("is_default")]
     public bool IsDefault { get; set; }
 
     [BsonElement("created_at")]
     public string CreatedAt { get; set; } = string.Empty;
 }
-

@@ -20,7 +20,13 @@ public class PermissionService : IPermissionService
 
     public async Task<PermissionMatrixDto> GetPermissionMatrixAsync()
     {
-        var roles = await _roles.Find(r => r.IsActive).ToListAsync();
+        var rolesRaw = await _roles.Find(r => r.IsActive).ToListAsync();
+        var roles = rolesRaw
+            .Where(r => !string.IsNullOrWhiteSpace(r.Code))
+            .GroupBy(r => r.Code!.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .OrderBy(r => r.Code)
+            .ToList();
         var fields = await _fields.Find(_ => true).ToListAsync();
         var fieldPermissions = await _fieldPermissions.Find(_ => true).ToListAsync();
 
@@ -34,25 +40,34 @@ public class PermissionService : IPermissionService
         var qlcpFields = fields.Where(f => f.ModuleCode == "qlcp" && f.Code != "auditLog").ToList();
         var userFields = fields.Where(f => f.ModuleCode == "users").ToList();
         var dashboardFields = fields.Where(f => f.ModuleCode == "dashboard").ToList();
+        var workDashboardFields = fields.Where(f => f.ModuleCode == "work_dashboard").ToList();
         var exportFields = fields.Where(f => f.ModuleCode == "export").ToList();
         var schedulingFields = fields.Where(f => f.ModuleCode == "scheduling").ToList();
         var auditFields = fields.Where(f => f.ModuleCode == "audit").ToList();
+        var companyFields = fields.Where(f => f.ModuleCode == "companies").ToList();
+        var projectFields = fields.Where(f => f.ModuleCode == "projects").ToList();
 
         var qlkhGroups = BuildFieldGroups(qlkhFields);
         var qlcpGroups = BuildFieldGroups(qlcpFields);
         var userGroups = BuildFieldGroups(userFields);
         var dashboardGroups = BuildFieldGroups(dashboardFields);
+        var workDashboardGroups = BuildFieldGroups(workDashboardFields);
         var exportGroups = BuildFieldGroups(exportFields);
         var schedulingGroups = BuildFieldGroups(schedulingFields);
         var auditGroups = BuildFieldGroups(auditFields);
+        var companyGroups = BuildFieldGroups(companyFields);
+        var projectGroups = BuildFieldGroups(projectFields);
 
         var qlkhPerm = BuildPermissionMap("qlkh", qlkhFields, roles, fieldPermissions);
         var qlcpPerm = BuildPermissionMap("qlcp", qlcpFields, roles, fieldPermissions);
         var userPerm = BuildPermissionMap("users", userFields, roles, fieldPermissions);
         var dashboardPerm = BuildPermissionMap("dashboard", dashboardFields, roles, fieldPermissions);
+        var workDashboardPerm = BuildPermissionMap("work_dashboard", workDashboardFields, roles, fieldPermissions);
         var exportPerm = BuildPermissionMap("export", exportFields, roles, fieldPermissions);
         var schedulingPerm = BuildPermissionMap("scheduling", schedulingFields, roles, fieldPermissions);
         var auditPerm = BuildPermissionMap("audit", auditFields, roles, fieldPermissions);
+        var companyPerm = BuildPermissionMap("companies", companyFields, roles, fieldPermissions);
+        var projectPerm = BuildPermissionMap("projects", projectFields, roles, fieldPermissions);
 
         return new PermissionMatrixDto
         {
@@ -61,16 +76,22 @@ public class PermissionService : IPermissionService
             QlcpFields = qlcpGroups,
             UserFields = userGroups,
             DashboardFields = dashboardGroups,
+            WorkDashboardFields = workDashboardGroups,
             ExportFields = exportGroups,
             SchedulingFields = schedulingGroups,
             AuditFields = auditGroups,
+            CompanyFields = companyGroups,
+            ProjectFields = projectGroups,
             QlkhPermissions = qlkhPerm,
             QlcpPermissions = qlcpPerm,
             UserPermissions = userPerm,
             DashboardPermissions = dashboardPerm,
+            WorkDashboardPermissions = workDashboardPerm,
             ExportPermissions = exportPerm,
             SchedulingPermissions = schedulingPerm,
-            AuditPermissions = auditPerm
+            AuditPermissions = auditPerm,
+            CompanyPermissions = companyPerm,
+            ProjectPermissions = projectPerm
         };
     }
 

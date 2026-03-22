@@ -1,0 +1,46 @@
+.projects-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.projects-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.projects-card {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.projects-row-even td {
+  background: #fafafa;
+}
+
+.projects-row-odd td {
+  background: #ffffff;
+}
+
+.projects-name-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.projects-sub {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  line-height: 1.2;
+}
+
+.projects-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+

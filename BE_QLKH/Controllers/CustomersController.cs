@@ -15,15 +15,18 @@ namespace BE_QLKH.Controllers;
 [Authorize]
 public class CustomersController : ControllerBase
 {
+    private readonly IMongoDatabase _db;
     private readonly IMongoCollection<Customer> _customers;
     private readonly IMongoCollection<User> _users;
+    private readonly IMongoCollection<Company> _companies;
     private readonly IAuditLogService _auditLogService;
 
     public CustomersController(IMongoClient client, IOptions<MongoDbSettings> options, IAuditLogService auditLogService)
     {
-        var db = client.GetDatabase(options.Value.DatabaseName);
-        _customers = db.GetCollection<Customer>("customers");
-        _users = db.GetCollection<User>("users");
+        _db = client.GetDatabase(options.Value.DatabaseName);
+        _customers = _db.GetCollection<Customer>("customers");
+        _users = _db.GetCollection<User>("users");
+        _companies = _db.GetCollection<Company>("companies");
         _auditLogService = auditLogService;
     }
 
@@ -35,6 +38,13 @@ public class CustomersController : ControllerBase
             return legacyId;
         }
         return 0;
+    }
+
+    private async Task<string> ResolveCustomerSchemaVersion(string companyId)
+    {
+        var company = await _companies.Find(c => c.Id == companyId).FirstOrDefaultAsync();
+        if (company != null && string.Equals(company.Code, "SHTT", StringComparison.OrdinalIgnoreCase)) return "shtt";
+        return "standard";
     }
 
     [HttpGet]
@@ -217,6 +227,12 @@ public class CustomersController : ControllerBase
             potentialLevel = c.PotentialLevel,
             sourceClassification = c.SourceClassification,
             nsnnSource = c.NsnnSource,
+            schemaVersion = c.SchemaVersion,
+            needDetail = c.NeedDetail,
+            productLink = c.ProductLink,
+            ownerUserId = c.OwnerUserId,
+            lifecycleStatus = c.LifecycleStatus,
+            tags = c.Tags,
             createdAt = c.CreatedAt,
             createdBy = c.CreatedBy,
             createdByName = userNameMap.TryGetValue(c.CreatedBy, out var cName) ? cName : string.Empty,
@@ -236,7 +252,9 @@ public class CustomersController : ControllerBase
     public async Task<ActionResult<object>> GetCustomerByLegacyId(int id)
     {
         var companyId = TenantContext.GetCompanyIdOrThrow(User);
-        var customer = await _customers.Find(TenantContext.CompanyFilter<Customer>(companyId) & Builders<Customer>.Filter.Eq(c => c.LegacyId, id)).FirstOrDefaultAsync();
+        var filter = TenantContext.CompanyFilter<Customer>(companyId) & Builders<Customer>.Filter.Eq(c => c.LegacyId, id);
+
+        var customer = await _customers.Find(filter).FirstOrDefaultAsync();
         if (customer == null) return NotFound(new { message = "Customer not found" });
 
         var userIds = new[] { customer.CreatedBy, customer.UpdatedBy }.Where(x => x > 0).Distinct().ToList();
@@ -307,6 +325,12 @@ public class CustomersController : ControllerBase
             potentialLevel = customer.PotentialLevel,
             sourceClassification = customer.SourceClassification,
             nsnnSource = customer.NsnnSource,
+            schemaVersion = customer.SchemaVersion,
+            needDetail = customer.NeedDetail,
+            productLink = customer.ProductLink,
+            ownerUserId = customer.OwnerUserId,
+            lifecycleStatus = customer.LifecycleStatus,
+            tags = customer.Tags,
             createdAt = customer.CreatedAt,
             createdBy = customer.CreatedBy,
             createdByName = userNameMap.TryGetValue(customer.CreatedBy, out var cName) ? cName : string.Empty,
@@ -325,17 +349,19 @@ public class CustomersController : ControllerBase
 
         input.Id = ObjectId.GenerateNewId().ToString();
         input.CompanyId = companyId;
+        if (string.IsNullOrWhiteSpace(input.SchemaVersion))
+        {
+            input.SchemaVersion = await ResolveCustomerSchemaVersion(companyId);
+        }
+        if (!input.OwnerUserId.HasValue || input.OwnerUserId.Value <= 0)
+        {
+            input.OwnerUserId = actorId > 0 ? actorId : null;
+        }
         input.CreatedAt = now;
         input.CreatedBy = actorId;
         input.UpdatedAt = now;
         input.UpdatedBy = actorId;
-
-        var maxLegacyId = await _customers.Find(_ => true)
-            .SortByDescending(c => c.LegacyId)
-            .Limit(1)
-            .FirstOrDefaultAsync();
-
-        input.LegacyId = maxLegacyId != null ? maxLegacyId.LegacyId + 1 : 1;
+        input.LegacyId = await TenantContext.GetNextLegacyIdAsync(_db, companyId, "customers", HttpContext.RequestAborted);
 
         await _customers.InsertOneAsync(input);
 
@@ -403,6 +429,12 @@ public class CustomersController : ControllerBase
             potentialLevel = input.PotentialLevel,
             sourceClassification = input.SourceClassification,
             nsnnSource = input.NsnnSource,
+            schemaVersion = input.SchemaVersion,
+            needDetail = input.NeedDetail,
+            productLink = input.ProductLink,
+            ownerUserId = input.OwnerUserId,
+            lifecycleStatus = input.LifecycleStatus,
+            tags = input.Tags,
             createdAt = input.CreatedAt,
             createdBy = input.CreatedBy,
             createdByName = actorName,
@@ -416,7 +448,9 @@ public class CustomersController : ControllerBase
     public async Task<ActionResult<object>> UpdateCustomer(int id, [FromBody] Customer input)
     {
         var companyId = TenantContext.GetCompanyIdOrThrow(User);
-        var customer = await _customers.Find(TenantContext.CompanyFilter<Customer>(companyId) & Builders<Customer>.Filter.Eq(c => c.LegacyId, id)).FirstOrDefaultAsync();
+        var filter = TenantContext.CompanyFilter<Customer>(companyId) & Builders<Customer>.Filter.Eq(c => c.LegacyId, id);
+
+        var customer = await _customers.Find(filter).FirstOrDefaultAsync();
         if (customer == null) return NotFound(new { message = "Customer not found" });
 
         var before = JsonSerializer.Deserialize<Customer>(JsonSerializer.Serialize(customer)) ?? customer;
@@ -481,6 +515,12 @@ public class CustomersController : ControllerBase
         customer.PotentialLevel = input.PotentialLevel ?? customer.PotentialLevel;
         customer.SourceClassification = input.SourceClassification ?? customer.SourceClassification;
         customer.NsnnSource = input.NsnnSource ?? customer.NsnnSource;
+        customer.SchemaVersion = input.SchemaVersion ?? customer.SchemaVersion;
+        customer.NeedDetail = input.NeedDetail ?? customer.NeedDetail;
+        customer.ProductLink = input.ProductLink ?? customer.ProductLink;
+        customer.OwnerUserId = input.OwnerUserId ?? customer.OwnerUserId;
+        customer.LifecycleStatus = input.LifecycleStatus ?? customer.LifecycleStatus;
+        customer.Tags = input.Tags ?? customer.Tags;
 
         customer.UpdatedAt = now;
         customer.UpdatedBy = actorId;
@@ -551,6 +591,12 @@ public class CustomersController : ControllerBase
             potentialLevel = customer.PotentialLevel,
             sourceClassification = customer.SourceClassification,
             nsnnSource = customer.NsnnSource,
+            schemaVersion = customer.SchemaVersion,
+            needDetail = customer.NeedDetail,
+            productLink = customer.ProductLink,
+            ownerUserId = customer.OwnerUserId,
+            lifecycleStatus = customer.LifecycleStatus,
+            tags = customer.Tags,
             createdAt = customer.CreatedAt,
             createdBy = customer.CreatedBy,
             createdByName = creator?.FullName ?? string.Empty,
@@ -564,13 +610,15 @@ public class CustomersController : ControllerBase
     public async Task<ActionResult<object>> DeleteCustomer(int id)
     {
         var companyId = TenantContext.GetCompanyIdOrThrow(User);
-        var customer = await _customers.Find(TenantContext.CompanyFilter<Customer>(companyId) & Builders<Customer>.Filter.Eq(c => c.LegacyId, id)).FirstOrDefaultAsync();
+        var filter = TenantContext.CompanyFilter<Customer>(companyId) & Builders<Customer>.Filter.Eq(c => c.LegacyId, id);
+
+        var customer = await _customers.Find(filter).FirstOrDefaultAsync();
         if (customer == null) return NotFound(new { message = "Customer not found" });
 
         var actorId = GetActorLegacyId();
         var actor = actorId > 0 ? await _users.Find(u => u.LegacyId == actorId).FirstOrDefaultAsync() : null;
 
-        var result = await _customers.DeleteOneAsync(TenantContext.CompanyFilter<Customer>(companyId) & Builders<Customer>.Filter.Eq(c => c.LegacyId, id));
+        var result = await _customers.DeleteOneAsync(filter);
         if (result.DeletedCount == 0) return NotFound(new { message = "Customer not found" });
         await _auditLogService.LogAsync("customer", id, "delete", actor, customer, null);
         return Ok(new { message = "Customer deleted" });

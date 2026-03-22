@@ -17,6 +17,7 @@ import {
   MenuFoldOutlined,
   CalendarOutlined,
   HistoryOutlined,
+  BarChartOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../context/AuthContext';
 import { useNotification } from '../../context/NotificationContext';
@@ -113,16 +114,28 @@ const AppLayout = ({ children }) => {
   );
 
   const getMenuItems = () => {
+    const role = user?.role;
+    const canViewWorkDashboard = !!role;
+
     const items = [
       {
         key: '/dashboard',
         icon: <DashboardOutlined />,
         label: 'Dashboard',
       },
+      ...(canViewWorkDashboard
+        ? [
+            {
+              key: '/work-dashboard',
+              icon: <BarChartOutlined />,
+              label: 'Dashboard công việc',
+            },
+          ]
+        : []),
       {
         key: '/customers',
         icon: <UserOutlined />,
-        label: 'Quản lý KH SHTT',
+        label: 'Quản lý KH',
       },
       {
         key: '/costs',
@@ -133,6 +146,11 @@ const AppLayout = ({ children }) => {
         key: '/scheduling',
         icon: <CalendarOutlined />,
         label: 'Chấm công dự án',
+      },
+      {
+        key: '/projects',
+        icon: <CheckCircleOutlined />,
+        label: 'Quản lý dự án',
       },
     ];
 

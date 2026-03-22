@@ -38,6 +38,10 @@ module.exports = {
         sourceMapLoaderRule.exclude = /node_modules/;
       }
 
+      if (webpackConfig.mode === 'production') {
+        webpackConfig.devtool = false;
+      }
+
       const webpackCacheDir = path.join(cacheRoot, 'webpack-cache');
       ensureDir(webpackCacheDir);
       webpackConfig.cache = { type: 'filesystem', cacheDirectory: webpackCacheDir };
@@ -84,9 +88,21 @@ module.exports = {
         });
       };
       updateBabelLoader(webpackConfig.module?.rules);
+
+      if (webpackConfig.optimization && Array.isArray(webpackConfig.optimization.minimizer)) {
+        webpackConfig.optimization.minimizer.forEach((minimizer) => {
+          if (minimizer && minimizer.constructor && minimizer.constructor.name === 'TerserPlugin') {
+            minimizer.options = minimizer.options || {};
+            minimizer.options.parallel = false;
+          }
+          if (minimizer && minimizer.constructor && minimizer.constructor.name === 'CssMinimizerPlugin') {
+            minimizer.options = minimizer.options || {};
+            minimizer.options.parallel = false;
+          }
+        });
+      }
       
       return webpackConfig;
     },
   },
 };
-

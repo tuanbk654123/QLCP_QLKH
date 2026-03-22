@@ -18,6 +18,7 @@ public class DashboardController : ControllerBase
     private readonly IMongoCollection<Customer> _customers;
     private readonly IMongoCollection<Cost> _costs;
     private readonly IMongoCollection<UserCompany> _userCompanies;
+    private readonly IMongoCollection<Company> _companies;
 
     public DashboardController(IMongoClient client, IOptions<MongoDbSettings> options)
     {
@@ -25,6 +26,7 @@ public class DashboardController : ControllerBase
         _customers = db.GetCollection<Customer>("customers");
         _costs = db.GetCollection<Cost>("costs");
         _userCompanies = db.GetCollection<UserCompany>("user_companies");
+        _companies = db.GetCollection<Company>("companies");
     }
 
     private static IEnumerable<Customer> FilterCustomersByDate(IEnumerable<Customer> customers, string? fromDate, string? toDate)
@@ -152,11 +154,16 @@ public class DashboardController : ControllerBase
     }
 
     [HttpGet("overview-all")]
-    public async Task<ActionResult<object>> GetOverviewAll([FromQuery] string? fromDate, [FromQuery] string? toDate)
+    public async Task<ActionResult<object>> GetOverviewAll([FromQuery] string? fromDate, [FromQuery] string? toDate, [FromQuery] string? companyId)
     {
         if (!CanViewAllCompaniesDashboard()) return StatusCode(403, new { message = "Bạn không có quyền xem Dashboard tổng" });
 
         var companyIds = await GetAccessibleCompanyIds();
+        if (!string.IsNullOrWhiteSpace(companyId))
+        {
+            if (!companyIds.Contains(companyId)) return StatusCode(403, new { message = "Bạn không có quyền truy cập công ty này" });
+            companyIds = new List<string> { companyId };
+        }
         if (companyIds.Count == 0) return Ok(new { totalCustomers = 0, activeCustomers = 0, totalRevenue = 0m, totalExpense = 0m });
 
         var customerFilter = BuildCompanyIdsFilter<Customer>(companyIds);
@@ -209,10 +216,15 @@ public class DashboardController : ControllerBase
     }
 
     [HttpGet("transactions-all")]
-    public async Task<ActionResult<object>> GetTransactionsAll([FromQuery] string? fromDate, [FromQuery] string? toDate)
+    public async Task<ActionResult<object>> GetTransactionsAll([FromQuery] string? fromDate, [FromQuery] string? toDate, [FromQuery] string? companyId)
     {
         if (!CanViewAllCompaniesDashboard()) return StatusCode(403, new { message = "Bạn không có quyền xem Dashboard tổng" });
         var companyIds = await GetAccessibleCompanyIds();
+        if (!string.IsNullOrWhiteSpace(companyId))
+        {
+            if (!companyIds.Contains(companyId)) return StatusCode(403, new { message = "Bạn không có quyền truy cập công ty này" });
+            companyIds = new List<string> { companyId };
+        }
         if (companyIds.Count == 0) return Ok(new { transactions = Array.Empty<object>() });
 
         var costsFilter = BuildCompanyIdsFilter<Cost>(companyIds);
@@ -274,10 +286,15 @@ public class DashboardController : ControllerBase
     }
 
     [HttpGet("customer-growth-all")]
-    public async Task<ActionResult<object>> GetCustomerGrowthAll([FromQuery] int year)
+    public async Task<ActionResult<object>> GetCustomerGrowthAll([FromQuery] int year, [FromQuery] string? companyId)
     {
         if (!CanViewAllCompaniesDashboard()) return StatusCode(403, new { message = "Bạn không có quyền xem Dashboard tổng" });
         var companyIds = await GetAccessibleCompanyIds();
+        if (!string.IsNullOrWhiteSpace(companyId))
+        {
+            if (!companyIds.Contains(companyId)) return StatusCode(403, new { message = "Bạn không có quyền truy cập công ty này" });
+            companyIds = new List<string> { companyId };
+        }
         if (companyIds.Count == 0) return Ok(Enumerable.Range(1, 12).Select(m => new { name = $"Tháng {m}", Total = 0, Consulted = 0 }).ToList());
 
         var customerFilter = BuildCompanyIdsFilter<Customer>(companyIds);
@@ -353,10 +370,15 @@ public class DashboardController : ControllerBase
     }
 
     [HttpGet("project-costs-all")]
-    public async Task<ActionResult<object>> GetProjectCostsAll([FromQuery] int? month, [FromQuery] int year)
+    public async Task<ActionResult<object>> GetProjectCostsAll([FromQuery] int? month, [FromQuery] int year, [FromQuery] string? companyId)
     {
         if (!CanViewAllCompaniesDashboard()) return StatusCode(403, new { message = "Bạn không có quyền xem Dashboard tổng" });
         var companyIds = await GetAccessibleCompanyIds();
+        if (!string.IsNullOrWhiteSpace(companyId))
+        {
+            if (!companyIds.Contains(companyId)) return StatusCode(403, new { message = "Bạn không có quyền truy cập công ty này" });
+            companyIds = new List<string> { companyId };
+        }
         if (companyIds.Count == 0) return Ok(new List<object>());
 
         var costsFilter = BuildCompanyIdsFilter<Cost>(companyIds);
@@ -391,6 +413,86 @@ public class DashboardController : ControllerBase
         return Ok(projectStats);
     }
 
+    [HttpGet("companies")]
+    public async Task<ActionResult<object>> GetDashboardCompanies()
+    {
+        if (!CanViewAllCompaniesDashboard()) return StatusCode(403, new { message = "Bạn không có quyền xem Dashboard tổng" });
+        var companyIds = await GetAccessibleCompanyIds();
+        if (companyIds.Count == 0) return Ok(new { items = Array.Empty<object>() });
+
+        var companies = await _companies.Find(c => companyIds.Contains(c.Id) && c.Status == "active").ToListAsync();
+        return Ok(new
+        {
+            items = companies.Select(c => new { id = c.Id, code = c.Code, name = c.Name }).OrderBy(x => x.code).ToList()
+        });
+    }
+
+    [HttpGet("overview-breakdown")]
+    public async Task<ActionResult<object>> GetOverviewBreakdown([FromQuery] string? fromDate, [FromQuery] string? toDate, [FromQuery] string? companyId)
+    {
+        if (!CanViewAllCompaniesDashboard()) return StatusCode(403, new { message = "Bạn không có quyền xem Dashboard tổng" });
+
+        var companyIds = await GetAccessibleCompanyIds();
+        if (!string.IsNullOrWhiteSpace(companyId))
+        {
+            if (!companyIds.Contains(companyId)) return StatusCode(403, new { message = "Bạn không có quyền truy cập công ty này" });
+            companyIds = new List<string> { companyId };
+        }
+
+        if (companyIds.Count == 0)
+        {
+            return Ok(new { items = Array.Empty<object>() });
+        }
+
+        var companies = await _companies.Find(c => companyIds.Contains(c.Id) && c.Status == "active").ToListAsync();
+        var companyMeta = companies.ToDictionary(c => c.Id, c => c);
+
+        var customerFilter = BuildCompanyIdsFilter<Customer>(companyIds);
+        var allCustomers = await _customers.Find(customerFilter).ToListAsync();
+        var filteredCustomers = FilterCustomersByDate(allCustomers, fromDate, toDate).ToList();
+
+        var costsFilter = BuildCompanyIdsFilter<Cost>(companyIds);
+        var allCosts = await _costs.Find(costsFilter).ToListAsync();
+        var filteredCosts = FilterCostsByDate(allCosts, fromDate, toDate).ToList();
+
+        var customersByCompany = filteredCustomers
+            .GroupBy(c => c.CompanyId ?? string.Empty)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var costsByCompany = filteredCosts
+            .GroupBy(c => c.CompanyId ?? string.Empty)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var items = new List<object>();
+        foreach (var cid in companyIds)
+        {
+            if (!companyMeta.TryGetValue(cid, out var company)) continue;
+
+            customersByCompany.TryGetValue(cid, out var custList);
+            costsByCompany.TryGetValue(cid, out var costList);
+
+            var totalCustomers = custList?.Count ?? 0;
+            var activeCustomers = custList?.Count(x => x.Status == "active") ?? 0;
+
+            var paid = (costList ?? new List<Cost>()).Where(c => c.PaymentStatus == "Đã thanh toán");
+            var totalRevenue = paid.Where(c => c.TransactionType == "Thu").Sum(c => c.TotalAmount);
+            var totalExpense = paid.Where(c => c.TransactionType == "Chi").Sum(c => c.TotalAmount);
+
+            items.Add(new
+            {
+                companyId = company.Id,
+                companyCode = company.Code,
+                companyName = company.Name,
+                totalCustomers,
+                activeCustomers,
+                totalRevenue,
+                totalExpense
+            });
+        }
+
+        return Ok(new { items });
+    }
+
     private bool CanViewAllCompaniesDashboard()
     {
         var role = User.FindFirst(ClaimTypes.Role)?.Value;
@@ -402,6 +504,16 @@ public class DashboardController : ControllerBase
 
     private async Task<List<string>> GetAccessibleCompanyIds()
     {
+        var role = User.FindFirst(ClaimTypes.Role)?.Value;
+        if (string.Equals(role, "admin", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(role, "ceo", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(role, "assistant_ceo", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(role, "hr", StringComparison.OrdinalIgnoreCase))
+        {
+            var allCompanies = await _companies.Find(c => c.Status == "active").Project(c => c.Id).ToListAsync();
+            return allCompanies.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
+        }
+
         var legacyIdClaim = User.FindFirst("legacy_id")?.Value;
         if (legacyIdClaim == null || !int.TryParse(legacyIdClaim, out var legacyId)) return new List<string>();
         var ids = await _userCompanies.Find(x => x.UserLegacyId == legacyId).Project(x => x.CompanyId).ToListAsync();

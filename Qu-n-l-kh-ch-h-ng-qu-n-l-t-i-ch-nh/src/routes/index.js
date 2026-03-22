@@ -3,9 +3,9 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from '../components/ProtectedRoute';
 import AppLayout from '../components/AppLayout';
 import Login from '../modules/auth/Login';
-import Customers from '../modules/customers';
+import CustomersEntry from '../modules/customers/CustomerEntry';
 import Costs from '../modules/costs';
-import Dashboard from '../modules/dashboard';
+import Dashboard, { DashboardCompanyRoute } from '../modules/dashboard';
 import MyAccount from '../modules/account/MyAccount';
 import Users from '../modules/users';
 import PermissionModule from '../modules/permissions';
@@ -14,6 +14,9 @@ import ExportWord from '../modules/export-word';
 import SchedulingPage from '../modules/scheduling';
 import AuditLogsPage from '../modules/audit-logs';
 import Companies from '../modules/companies';
+import Projects from '../modules/projects';
+import ProjectDetail from '../modules/projects/ProjectDetail';
+import WorkDashboard from '../modules/work-dashboard';
 
 const AppRoutes = () => {
   return (
@@ -27,7 +30,11 @@ const AppRoutes = () => {
               <Routes>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/customers" element={<Customers />} />
+                <Route path="/dashboard/company/:companyId" element={<DashboardCompanyRoute />} />
+                <Route path="/work-dashboard" element={<WorkDashboard />} />
+                <Route path="/projects" element={<Projects />} />
+                <Route path="/projects/:id" element={<ProjectDetail />} />
+                <Route path="/customers" element={<CustomersEntry />} />
                 <Route path="/costs" element={<Costs />} />
                 <Route path="/my-account" element={<MyAccount />} />
                 <Route path="/users" element={<Users />} />

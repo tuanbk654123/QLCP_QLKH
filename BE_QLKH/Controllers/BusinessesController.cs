@@ -1,4 +1,5 @@
 using BE_QLKH.Models;
+using BE_QLKH.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -12,12 +13,13 @@ namespace BE_QLKH.Controllers;
 [Authorize]
 public class BusinessesController : ControllerBase
 {
+    private readonly IMongoDatabase _db;
     private readonly IMongoCollection<Business> _businesses;
 
     public BusinessesController(IMongoClient client, IOptions<MongoDbSettings> options)
     {
-        var db = client.GetDatabase(options.Value.DatabaseName);
-        _businesses = db.GetCollection<Business>("businesses");
+        _db = client.GetDatabase(options.Value.DatabaseName);
+        _businesses = _db.GetCollection<Business>("businesses");
     }
 
     [HttpGet]
@@ -25,7 +27,8 @@ public class BusinessesController : ControllerBase
     {
         if (page < 1) page = 1;
 
-        var filter = Builders<Business>.Filter.Empty;
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
+        var filter = TenantContext.CompanyFilter<Business>(companyId);
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -76,7 +79,10 @@ public class BusinessesController : ControllerBase
     [HttpGet("{id:int}")]
     public async Task<ActionResult<object>> GetBusinessByLegacyId(int id)
     {
-        var business = await _businesses.Find(b => b.LegacyId == id).FirstOrDefaultAsync();
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
+        var filter = TenantContext.CompanyFilter<Business>(companyId) & Builders<Business>.Filter.Eq(b => b.LegacyId, id);
+
+        var business = await _businesses.Find(filter).FirstOrDefaultAsync();
         if (business == null) return NotFound(new { message = "Business not found" });
 
         return Ok(new
@@ -102,14 +108,11 @@ public class BusinessesController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<object>> CreateBusiness([FromBody] Business input)
     {
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
+
         input.Id = ObjectId.GenerateNewId().ToString();
-
-        var maxLegacyId = await _businesses.Find(_ => true)
-            .SortByDescending(b => b.LegacyId)
-            .Limit(1)
-            .FirstOrDefaultAsync();
-
-        input.LegacyId = maxLegacyId != null ? maxLegacyId.LegacyId + 1 : 1;
+        input.CompanyId = companyId;
+        input.LegacyId = await TenantContext.GetNextLegacyIdAsync(_db, companyId, "businesses", HttpContext.RequestAborted);
 
         await _businesses.InsertOneAsync(input);
 
@@ -136,11 +139,15 @@ public class BusinessesController : ControllerBase
     [HttpPut("{id:int}")]
     public async Task<ActionResult<object>> UpdateBusiness(int id, [FromBody] Business input)
     {
-        var business = await _businesses.Find(b => b.LegacyId == id).FirstOrDefaultAsync();
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
+        var filter = TenantContext.CompanyFilter<Business>(companyId) & Builders<Business>.Filter.Eq(b => b.LegacyId, id);
+
+        var business = await _businesses.Find(filter).FirstOrDefaultAsync();
         if (business == null) return NotFound(new { message = "Business not found" });
 
         input.Id = business.Id;
         input.LegacyId = business.LegacyId;
+        input.CompanyId = business.CompanyId;
 
         await _businesses.ReplaceOneAsync(b => b.Id == business.Id, input);
 
@@ -167,7 +174,10 @@ public class BusinessesController : ControllerBase
     [HttpDelete("{id:int}")]
     public async Task<ActionResult<object>> DeleteBusiness(int id)
     {
-        var result = await _businesses.DeleteOneAsync(b => b.LegacyId == id);
+        var companyId = TenantContext.GetCompanyIdOrThrow(User);
+        var filter = TenantContext.CompanyFilter<Business>(companyId) & Builders<Business>.Filter.Eq(b => b.LegacyId, id);
+
+        var result = await _businesses.DeleteOneAsync(filter);
         if (result.DeletedCount == 0) return NotFound(new { message = "Business not found" });
         return Ok(new { message = "Business deleted" });
     }

@@ -61,7 +61,8 @@ public class AuthController : ControllerBase
 
         Console.WriteLine($"Login successful for user: {request.Username}");
         var activeCompanyId = await ResolveActiveCompanyId(user);
-        var token = GenerateJwtToken(user, activeCompanyId);
+        var roleForToken = await ResolveRoleForCompany(user, activeCompanyId);
+        var token = GenerateJwtToken(user, activeCompanyId, roleForToken);
 
         return Ok(new
         {
@@ -179,7 +180,8 @@ public class AuthController : ControllerBase
         var user = await _users.Find(u => u.LegacyId == legacyId).FirstOrDefaultAsync();
         if (user == null) return Unauthorized();
 
-        var token = GenerateJwtToken(user, request.CompanyId);
+        var roleForToken = await ResolveRoleForCompany(user, request.CompanyId);
+        var token = GenerateJwtToken(user, request.CompanyId, roleForToken);
         return Ok(new
         {
             token,
@@ -233,7 +235,7 @@ public class AuthController : ControllerBase
         return false;
     }
 
-    private string GenerateJwtToken(User user, string companyId)
+    private string GenerateJwtToken(User user, string companyId, string roleCode)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_authSettings.Key));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -245,7 +247,7 @@ public class AuthController : ControllerBase
             new Claim("company_id", companyId),
             new Claim(ClaimTypes.Name, user.FullName),
             new Claim(ClaimTypes.NameIdentifier, user.Id),
-            new Claim(ClaimTypes.Role, user.RoleCode)
+            new Claim(ClaimTypes.Role, roleCode)
         };
 
         var token = new JwtSecurityToken(
@@ -256,6 +258,25 @@ public class AuthController : ControllerBase
             signingCredentials: creds);
 
         return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    private static bool IsGlobalRole(string roleCode)
+    {
+        return string.Equals(roleCode, "admin", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(roleCode, "ceo", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(roleCode, "assistant_ceo", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task<string> ResolveRoleForCompany(User user, string companyId)
+    {
+        if (IsGlobalRole(user.RoleCode)) return user.RoleCode;
+
+        var mapping = await _userCompanies
+            .Find(x => x.UserLegacyId == user.LegacyId && x.CompanyId == companyId)
+            .FirstOrDefaultAsync();
+
+        if (!string.IsNullOrWhiteSpace(mapping?.RoleCode)) return mapping!.RoleCode!;
+        return user.RoleCode;
     }
 
     private async Task<string> ResolveActiveCompanyId(User user)

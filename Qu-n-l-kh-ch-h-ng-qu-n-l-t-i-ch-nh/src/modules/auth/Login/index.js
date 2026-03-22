@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { Form, Input, Button, Card, message } from 'antd';
+import { Form, Input, Button, message, Typography } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import './index.css';
+
+const { Title, Text } = Typography;
 
 const Login = () => {
   const [loading, setLoading] = useState(false);
@@ -25,43 +27,42 @@ const Login = () => {
 
   return (
     <div className="login-container">
-      <Card className="login-card" title="Đăng nhập hệ thống">
-        <Form
-          name="login"
-          onFinish={onFinish}
-          autoComplete="off"
-          size="large"
-        >
-          <Form.Item
-            name="username"
-            rules={[{ required: true, message: 'Vui lòng nhập tên đăng nhập hoặc email!' }]}
-          >
-            <Input
-              prefix={<UserOutlined />}
-              placeholder="Tên đăng nhập hoặc Email"
-            />
-          </Form.Item>
+      <div className="login-left">
+        <div className="login-left-content">
+          <Title level={2} className="login-title">
+            Đăng nhập
+          </Title>
 
-          <Form.Item
-            name="password"
-            rules={[{ required: true, message: 'Vui lòng nhập mật khẩu!' }]}
-          >
-            <Input.Password
-              prefix={<LockOutlined />}
-              placeholder="Mật khẩu"
-            />
-          </Form.Item>
+          <Form name="login" onFinish={onFinish} autoComplete="off" size="large" layout="vertical">
+            <Form.Item
+              label="Email hoặc tên đăng nhập"
+              name="username"
+              rules={[{ required: true, message: 'Vui lòng nhập email hoặc tên đăng nhập!' }]}
+            >
+              <Input prefix={<UserOutlined />} placeholder="example@gmail.com" autoFocus />
+            </Form.Item>
 
-          <Form.Item>
-            <Button type="primary" htmlType="submit" block loading={loading}>
+            <Form.Item label="Mật khẩu" name="password" rules={[{ required: true, message: 'Vui lòng nhập mật khẩu!' }]}>
+              <Input.Password prefix={<LockOutlined />} placeholder="Nhập mật khẩu" />
+            </Form.Item>
+
+            <Button type="primary" htmlType="submit" block loading={loading} className="login-submit">
               Đăng nhập
             </Button>
-          </Form.Item>
-        </Form>
-      </Card>
+          </Form>
+        </div>
+
+        <div className="login-footer">
+          <Text type="secondary">© 2026</Text>
+        </div>
+      </div>
+
+      <div className="login-right" aria-hidden="true">
+        <div className="login-blob login-blob-1" />
+        <div className="login-blob login-blob-2" />
+      </div>
     </div>
   );
 };
 
 export default Login;
-
