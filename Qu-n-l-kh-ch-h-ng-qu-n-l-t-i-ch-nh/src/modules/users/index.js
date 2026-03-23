@@ -328,14 +328,6 @@ const Users = () => {
       ...getColumnSearchProps('id'),
     },
     { 
-      title: 'User_ID', 
-      dataIndex: 'userId', 
-      key: 'userId', 
-      width: 160,
-      sorter: true,
-      ...getColumnSearchProps('userId'),
-    },
-    { 
       title: 'Tên đăng nhập', 
       dataIndex: 'username', 
       key: 'username', 
@@ -767,16 +759,7 @@ const Users = () => {
           onFinish={handleSubmit}
         >
           <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="userId"
-                label="User ID"
-                rules={[{ required: true, message: 'Vui lòng nhập User ID' }]}
-              >
-                <Input disabled={!!editingUser} />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
+            <Col span={24}>
               <Form.Item
                 name="username"
                 label="Tên đăng nhập"

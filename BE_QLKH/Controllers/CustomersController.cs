@@ -51,10 +51,15 @@ public class CustomersController : ControllerBase
     public async Task<ActionResult<object>> GetCustomers(
         [FromQuery] string? search, 
         [FromQuery] int page = 1,
+        [FromQuery] int limit = 10,
+        [FromQuery] int pageSize = 0,
         [FromQuery] string? sortField = null,
         [FromQuery] string? sortOrder = null)
     {
         if (page < 1) page = 1;
+        if (pageSize > 0) limit = pageSize;
+        if (limit < 1) limit = 10;
+        if (limit > 200) limit = 200;
 
         var companyId = TenantContext.GetCompanyIdOrThrow(User);
 
@@ -81,7 +86,7 @@ public class CustomersController : ControllerBase
             var value = query.Value.ToString();
             
             if (string.IsNullOrEmpty(value)) continue;
-            if (new[] { "search", "page", "sortfield", "sortorder", "limit" }.Contains(key.ToLower())) continue;
+            if (new[] { "search", "page", "pagesize", "sortfield", "sortorder", "limit" }.Contains(key.ToLower())) continue;
 
             // Find matching property (case-insensitive)
             var prop = properties.FirstOrDefault(p => p.Name.Equals(key, StringComparison.OrdinalIgnoreCase));
@@ -142,15 +147,14 @@ public class CustomersController : ControllerBase
             }
         }
 
-        const int pageSize = 10;
-        var skip = (page - 1) * pageSize;
+        var skip = (page - 1) * limit;
 
         var total = await _customers.CountDocumentsAsync(filter);
         var customers = await _customers
             .Find(filter)
             .Sort(sort)
             .Skip(skip)
-            .Limit(pageSize)
+            .Limit(limit)
             .ToListAsync();
 
         var userIds = customers

@@ -88,12 +88,13 @@ public class ProjectModulesController : ControllerBase
         var role = GetRole(User);
         if (!CanManageModules(role)) return StatusCode(403, new { message = "Bạn không có quyền tạo module" });
 
-        var companyId = TenantContext.GetCompanyIdOrThrow(User);
         var actorId = GetActorLegacyId();
         var now = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
 
-        var project = await _projects.Find(TenantContext.CompanyFilter<Project>(companyId) & Builders<Project>.Filter.Eq(p => p.LegacyId, input.ProjectLegacyId)).FirstOrDefaultAsync();
+        var project = await _projects.Find(TenantContext.ScopeFilter<Project>(User) & Builders<Project>.Filter.Eq(p => p.LegacyId, input.ProjectLegacyId)).FirstOrDefaultAsync();
         if (project == null) return NotFound(new { message = "Project not found" });
+        if (string.IsNullOrWhiteSpace(project.CompanyId)) return BadRequest(new { message = "Project missing company_id" });
+        var companyId = project.CompanyId;
 
         input.Id = ObjectId.GenerateNewId().ToString();
         input.CompanyId = companyId;
@@ -127,11 +128,10 @@ public class ProjectModulesController : ControllerBase
         var role = GetRole(User);
         if (!CanManageModules(role)) return StatusCode(403, new { message = "Bạn không có quyền cập nhật module" });
 
-        var companyId = TenantContext.GetCompanyIdOrThrow(User);
         var actorId = GetActorLegacyId();
         var now = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
 
-        var filter = TenantContext.CompanyFilter<ProjectModule>(companyId) & Builders<ProjectModule>.Filter.Eq(m => m.LegacyId, id);
+        var filter = TenantContext.ScopeFilter<ProjectModule>(User) & Builders<ProjectModule>.Filter.Eq(m => m.LegacyId, id);
         var module = await _modules.Find(filter).FirstOrDefaultAsync();
         if (module == null) return NotFound(new { message = "Module not found" });
 
@@ -165,14 +165,14 @@ public class ProjectModulesController : ControllerBase
         var role = GetRole(User);
         if (!CanManageModules(role)) return StatusCode(403, new { message = "Bạn không có quyền xóa module" });
 
-        var companyId = TenantContext.GetCompanyIdOrThrow(User);
         var actorId = GetActorLegacyId();
         var now = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
 
-        var filter = TenantContext.CompanyFilter<ProjectModule>(companyId) & Builders<ProjectModule>.Filter.Eq(m => m.LegacyId, id);
+        var filter = TenantContext.ScopeFilter<ProjectModule>(User) & Builders<ProjectModule>.Filter.Eq(m => m.LegacyId, id);
         var module = await _modules.Find(filter).FirstOrDefaultAsync();
         if (module == null) return NotFound(new { message = "Module not found" });
 
+        var companyId = module.CompanyId;
         var taskFilter = TenantContext.CompanyFilter<ProjectTask>(companyId) & Builders<ProjectTask>.Filter.Eq(t => t.ModuleId, module.Id);
         var tasks = await _tasks.Find(taskFilter).ToListAsync();
 

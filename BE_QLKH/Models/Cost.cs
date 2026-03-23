@@ -89,6 +89,9 @@ public class Cost
     [BsonElement("created_by_user_id")]
     public int CreatedByUserId { get; set; }
 
+    [BsonElement("created_at")]
+    public string CreatedAt { get; set; } = string.Empty;
+
     [BsonElement("status_history")]
     public List<CostStatusHistory> StatusHistory { get; set; } = new();
 

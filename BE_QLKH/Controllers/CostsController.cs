@@ -22,6 +22,7 @@ public class CostsController : ControllerBase
     private readonly IMongoDatabase _db;
     private readonly IMongoCollection<Cost> _costs;
     private readonly IMongoCollection<User> _users;
+    private readonly IMongoCollection<Company> _companies;
     private readonly IMongoCollection<Notification> _notifications;
     private readonly IMongoCollection<UserCompany> _userCompanies;
     private readonly IHubContext<NotificationsHub> _hubContext;
@@ -40,6 +41,7 @@ public class CostsController : ControllerBase
         _db = client.GetDatabase(options.Value.DatabaseName);
         _costs = _db.GetCollection<Cost>("costs");
         _users = _db.GetCollection<User>("users");
+        _companies = _db.GetCollection<Company>("companies");
         _notifications = _db.GetCollection<Notification>("notifications");
         _userCompanies = _db.GetCollection<UserCompany>("user_companies");
         _hubContext = hubContext;
@@ -52,14 +54,15 @@ public class CostsController : ControllerBase
     public async Task<ActionResult<object>> GetCosts(
         [FromQuery] string? search, 
         [FromQuery] int page = 1,
+        [FromQuery] int limit = 10,
         [FromQuery] string? sortField = null,
         [FromQuery] string? sortOrder = null)
     {
         if (page < 1) page = 1;
-        const int pageSize = 10;
+        if (limit < 1) limit = 10;
+        if (limit > 200) limit = 200;
+        var pageSize = limit;
         var skip = (page - 1) * pageSize;
-
-        var companyId = TenantContext.GetCompanyIdOrThrow(User);
 
         var builder = Builders<Cost>.Filter;
         var filter = TenantContext.ScopeFilter<Cost>(User);
@@ -137,7 +140,10 @@ public class CostsController : ControllerBase
         }
 
         // Sorting
-        SortDefinition<Cost> sort = Builders<Cost>.Sort.Descending(c => c.LegacyId);
+        SortDefinition<Cost> sort = Builders<Cost>.Sort.Combine(
+            Builders<Cost>.Sort.Descending("created_at"),
+            Builders<Cost>.Sort.Descending("legacy_id")
+        );
         if (!string.IsNullOrEmpty(sortField))
         {
             var prop = properties.FirstOrDefault(p => p.Name.Equals(sortField, StringComparison.OrdinalIgnoreCase));
@@ -147,10 +153,10 @@ public class CostsController : ControllerBase
                     .FirstOrDefault() as BsonElementAttribute;
                 var dbField = bsonAttr?.ElementName ?? prop.Name;
                 
-                if (sortOrder?.ToLower() == "asc" || sortOrder?.ToLower() == "ascend")
-                    sort = Builders<Cost>.Sort.Ascending(dbField);
-                else
-                    sort = Builders<Cost>.Sort.Descending(dbField);
+                var primary = (sortOrder?.ToLower() == "asc" || sortOrder?.ToLower() == "ascend")
+                    ? Builders<Cost>.Sort.Ascending(dbField)
+                    : Builders<Cost>.Sort.Descending(dbField);
+                sort = Builders<Cost>.Sort.Combine(primary, Builders<Cost>.Sort.Descending("legacy_id"));
             }
         }
 
@@ -162,9 +168,20 @@ public class CostsController : ControllerBase
             .Limit(pageSize)
             .ToListAsync();
 
+        var companyIds = costs.Select(c => c.CompanyId).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
+        var companies = companyIds.Count == 0
+            ? new List<Company>()
+            : await _companies.Find(c => companyIds.Contains(c.Id)).ToListAsync();
+        var companyMap = companies.ToDictionary(c => c.Id, c => c);
+
         var result = costs.Select(c => new
         {
             id = c.LegacyId,
+            createdAt = c.CreatedAt,
+            companyId = c.CompanyId,
+            company = companyMap.TryGetValue(c.CompanyId, out var co)
+                ? new { id = co.Id, code = co.Code, name = co.Name }
+                : null,
             requester = c.Requester,
             department = c.Department,
             requestDate = c.RequestDate,
@@ -202,7 +219,6 @@ public class CostsController : ControllerBase
     [HttpGet("{id:int}")]
     public async Task<ActionResult<object>> GetCostByLegacyId(int id)
     {
-        var companyId = TenantContext.GetCompanyIdOrThrow(User);
         var filter = TenantContext.ScopeFilter<Cost>(User) & Builders<Cost>.Filter.Eq(c => c.LegacyId, id);
 
         var cost = await _costs.Find(filter).FirstOrDefaultAsync();
@@ -219,9 +235,18 @@ public class CostsController : ControllerBase
             }
         }
 
+        Company? company = null;
+        if (!string.IsNullOrWhiteSpace(cost.CompanyId))
+        {
+            company = await _companies.Find(c => c.Id == cost.CompanyId).FirstOrDefaultAsync();
+        }
+
         return Ok(new
         {
             id = cost.LegacyId,
+            createdAt = cost.CreatedAt,
+            companyId = cost.CompanyId,
+            company = company != null ? new { id = company.Id, code = company.Code, name = company.Name } : null,
             requester = cost.Requester,
             department = cost.Department,
             requestDate = cost.RequestDate,
@@ -260,10 +285,12 @@ public class CostsController : ControllerBase
 
         try
         {
+            var createdAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
             input.Id = ObjectId.GenerateNewId().ToString();
             input.CompanyId = companyId;
             input.LegacyId = await TenantContext.GetNextLegacyIdAsync(_db, companyId, "costs", HttpContext.RequestAborted);
             input.CreatedByUserId = userId;
+            input.CreatedAt = createdAt;
             input.PaymentStatus = "Đợi duyệt";
 
             input.StatusHistory = new List<CostStatusHistory>
@@ -272,7 +299,7 @@ public class CostsController : ControllerBase
                 {
                     Status = "Đợi duyệt",
                     ChangedByUserId = userId,
-                    ChangedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                    ChangedAt = createdAt,
                     Note = "Tạo mới và gửi duyệt"
                 }
             };

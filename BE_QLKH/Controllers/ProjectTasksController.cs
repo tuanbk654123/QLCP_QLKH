@@ -437,13 +437,13 @@ public class ProjectTasksController : ControllerBase
     [HttpGet("{id:int}")]
     public async Task<ActionResult<object>> GetTask(int id)
     {
-        var companyId = TenantContext.GetCompanyIdOrThrow(User);
         var role = GetRole(User);
         var actorId = GetActorLegacyId();
 
-        var filter = TenantContext.CompanyFilter<ProjectTask>(companyId) & Builders<ProjectTask>.Filter.Eq(t => t.LegacyId, id);
+        var filter = TenantContext.ScopeFilter<ProjectTask>(User) & Builders<ProjectTask>.Filter.Eq(t => t.LegacyId, id);
         var task = await _tasks.Find(filter).FirstOrDefaultAsync();
         if (task == null) return NotFound(new { message = "Task not found" });
+        var companyId = task.CompanyId;
 
         if (!CanViewAllInCompany(role))
         {
@@ -496,13 +496,13 @@ public class ProjectTasksController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<object>> CreateTask([FromBody] CreateTaskRequest request)
     {
-        var companyId = TenantContext.GetCompanyIdOrThrow(User);
         var role = GetRole(User);
         var actorId = GetActorLegacyId();
         var now = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
 
-        var project = await _projects.Find(TenantContext.CompanyFilter<Project>(companyId) & Builders<Project>.Filter.Eq(p => p.LegacyId, request.ProjectId)).FirstOrDefaultAsync();
+        var project = await _projects.Find(TenantContext.ScopeFilter<Project>(User) & Builders<Project>.Filter.Eq(p => p.LegacyId, request.ProjectId)).FirstOrDefaultAsync();
         if (project == null) return NotFound(new { message = "Project not found" });
+        var companyId = project.CompanyId;
 
         var module = await _modules.Find(TenantContext.CompanyFilter<ProjectModule>(companyId) & Builders<ProjectModule>.Filter.Eq(m => m.LegacyId, request.ModuleId)).FirstOrDefaultAsync();
         if (module == null) return NotFound(new { message = "Module not found" });
@@ -580,14 +580,14 @@ public class ProjectTasksController : ControllerBase
     [HttpPut("{id:int}")]
     public async Task<ActionResult<object>> UpdateTask(int id, [FromBody] UpdateTaskRequest input)
     {
-        var companyId = TenantContext.GetCompanyIdOrThrow(User);
         var role = GetRole(User);
         var actorId = GetActorLegacyId();
         var now = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
 
-        var filter = TenantContext.CompanyFilter<ProjectTask>(companyId) & Builders<ProjectTask>.Filter.Eq(t => t.LegacyId, id);
+        var filter = TenantContext.ScopeFilter<ProjectTask>(User) & Builders<ProjectTask>.Filter.Eq(t => t.LegacyId, id);
         var task = await _tasks.Find(filter).FirstOrDefaultAsync();
         if (task == null) return NotFound(new { message = "Task not found" });
+        var companyId = task.CompanyId;
 
         if (!CanViewAllInCompany(role))
         {
@@ -678,12 +678,12 @@ public class ProjectTasksController : ControllerBase
     [HttpPost("{id:int}/comment")]
     public async Task<ActionResult<object>> AddComment(int id, [FromBody] CommentRequest request)
     {
-        var companyId = TenantContext.GetCompanyIdOrThrow(User);
         var role = GetRole(User);
         var actorId = GetActorLegacyId();
 
-        var task = await _tasks.Find(TenantContext.CompanyFilter<ProjectTask>(companyId) & Builders<ProjectTask>.Filter.Eq(t => t.LegacyId, id)).FirstOrDefaultAsync();
+        var task = await _tasks.Find(TenantContext.ScopeFilter<ProjectTask>(User) & Builders<ProjectTask>.Filter.Eq(t => t.LegacyId, id)).FirstOrDefaultAsync();
         if (task == null) return NotFound(new { message = "Task not found" });
+        var companyId = task.CompanyId;
 
         if (!CanViewAllInCompany(role))
         {
@@ -697,14 +697,14 @@ public class ProjectTasksController : ControllerBase
     [HttpDelete("{id:int}")]
     public async Task<ActionResult<object>> DeleteTask(int id)
     {
-        var companyId = TenantContext.GetCompanyIdOrThrow(User);
         var role = GetRole(User);
         var actorId = GetActorLegacyId();
         var now = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
 
-        var filter = TenantContext.CompanyFilter<ProjectTask>(companyId) & Builders<ProjectTask>.Filter.Eq(t => t.LegacyId, id);
+        var filter = TenantContext.ScopeFilter<ProjectTask>(User) & Builders<ProjectTask>.Filter.Eq(t => t.LegacyId, id);
         var task = await _tasks.Find(filter).FirstOrDefaultAsync();
         if (task == null) return NotFound(new { message = "Task not found" });
+        var companyId = task.CompanyId;
 
         if (!CanViewAllInCompany(role))
         {

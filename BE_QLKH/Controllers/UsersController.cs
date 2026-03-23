@@ -345,6 +345,7 @@ public class UsersController : ControllerBase
             .FirstOrDefaultAsync();
 
         input.LegacyId = maxLegacyId != null ? maxLegacyId.LegacyId + 1 : 1;
+        input.UserId = $"U{input.LegacyId:000}";
 
         if (!string.IsNullOrEmpty(input.OffboardDate))
         {
@@ -436,6 +437,7 @@ public class UsersController : ControllerBase
         input.PasswordHash = user.PasswordHash;
         input.Id = user.Id;
         input.LegacyId = user.LegacyId;
+        input.UserId = user.UserId;
         input.CreatedAt = user.CreatedAt;
         input.CreatedBy = user.CreatedBy;
         input.CompanyId = string.IsNullOrWhiteSpace(input.CompanyId) ? user.CompanyId : input.CompanyId;

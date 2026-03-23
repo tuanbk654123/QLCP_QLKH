@@ -36,6 +36,8 @@ const Costs = () => {
       pageSize: 10,
       showSizeChanger: true,
     },
+    sortField: 'createdAt',
+    sortOrder: 'descend',
   });
 
   const [costs, setCosts] = useState([]);
@@ -246,6 +248,25 @@ const Costs = () => {
       fixed: 'left',
       sorter: true,
       ...getColumnSearchProps('id'),
+    },
+    {
+      title: 'Thời gian tạo',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      width: 160,
+      sorter: true,
+      ...getColumnSearchProps('createdAt'),
+    },
+    {
+      title: 'Công ty',
+      dataIndex: 'company',
+      key: 'company',
+      width: 220,
+      render: (company) => {
+        if (!company) return '';
+        if (company.code) return `${company.code} - ${company.name || ''}`.trim();
+        return company.name || '';
+      },
     },
     {
       title: 'Trạng thái',

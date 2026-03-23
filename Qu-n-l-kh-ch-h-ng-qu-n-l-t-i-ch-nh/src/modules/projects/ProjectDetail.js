@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Card, Col, DatePicker, Descriptions, Form, Input, InputNumber, Modal, Progress, Row, Select, Space, Statistic, Table, Tabs, Tag, Typography, message } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { Button, Card, Col, DatePicker, Descriptions, Form, Input, InputNumber, Modal, Popconfirm, Progress, Row, Select, Space, Statistic, Table, Tabs, Tag, Typography, message } from 'antd';
+import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
 import axios from 'axios';
+import dayjs from 'dayjs';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import './ProjectDetail.css';
@@ -47,8 +48,11 @@ const ProjectDetail = () => {
   const [teamTaskPage, setTeamTaskPage] = useState(1);
   const [teamTaskPageSize, setTeamTaskPageSize] = useState(20);
 
+  const [activeTab, setActiveTab] = useState('modules');
   const [moduleOpen, setModuleOpen] = useState(false);
   const [taskOpen, setTaskOpen] = useState(false);
+  const [editingModule, setEditingModule] = useState(null);
+  const [editingTask, setEditingTask] = useState(null);
   const [moduleForm] = Form.useForm();
   const [taskForm] = Form.useForm();
 
@@ -151,8 +155,24 @@ const ProjectDetail = () => {
   }, [fetchTeamTasks]);
 
   const openCreateModule = () => {
+    setEditingModule(null);
     moduleForm.resetFields();
     moduleForm.setFieldsValue({ status: 'NOT_STARTED', priority: 'MEDIUM' });
+    setModuleOpen(true);
+  };
+
+  const openEditModule = (m) => {
+    setEditingModule(m);
+    moduleForm.resetFields();
+    moduleForm.setFieldsValue({
+      name: m?.name,
+      ownerUserId: m?.ownerUserId ?? null,
+      startDate: m?.startDate ? dayjs(m.startDate) : null,
+      endDate: m?.endDate ? dayjs(m.endDate) : null,
+      status: m?.status || 'NOT_STARTED',
+      priority: m?.priority || 'MEDIUM',
+      description: m?.description || null,
+    });
     setModuleOpen(true);
   };
 
@@ -167,7 +187,7 @@ const ProjectDetail = () => {
         endDate: values.endDate ? values.endDate.format('YYYY-MM-DD') : null,
         status: values.status,
         priority: values.priority,
-        description: values.description || null,
+        description: values.description ?? null,
       };
       await axios.post('/api/project-modules', payload);
       message.success('Đã tạo module');
@@ -180,7 +200,45 @@ const ProjectDetail = () => {
     }
   };
 
+  const updateModule = async () => {
+    try {
+      const values = await moduleForm.validateFields();
+      const payload = {
+        name: values.name,
+        ownerUserId: values.ownerUserId || null,
+        startDate: values.startDate ? values.startDate.format('YYYY-MM-DD') : null,
+        endDate: values.endDate ? values.endDate.format('YYYY-MM-DD') : null,
+        status: values.status,
+        priority: values.priority,
+        description: values.description ?? null,
+      };
+      await axios.put(`/api/project-modules/${editingModule.id}`, payload);
+      message.success('Đã cập nhật module');
+      setModuleOpen(false);
+      setEditingModule(null);
+      moduleForm.resetFields();
+      fetchModules();
+    } catch (e) {
+      if (e?.errorFields) return;
+      message.error('Không thể cập nhật module');
+    }
+  };
+
+  const deleteModule = async (moduleId) => {
+    try {
+      await axios.delete(`/api/project-modules/${moduleId}`);
+      message.success('Đã xóa module');
+      if (selectedModuleId === moduleId) setSelectedModuleId(null);
+      fetchModules();
+      fetchKanban();
+      fetchProject();
+    } catch (e) {
+      message.error(e?.response?.data?.message || 'Không thể xóa module');
+    }
+  };
+
   const openCreateTask = () => {
+    setEditingTask(null);
     taskForm.resetFields();
     taskForm.setFieldsValue({
       status: 'NOT_STARTED',
@@ -189,6 +247,32 @@ const ProjectDetail = () => {
       moduleId: selectedModuleId || null,
     });
     setTaskOpen(true);
+  };
+
+  const openEditTask = async (taskId) => {
+    try {
+      const res = await axios.get(`/api/project-tasks/${taskId}`);
+      const t = res.data;
+      setEditingTask({ id: t.id });
+      taskForm.resetFields();
+      taskForm.setFieldsValue({
+        moduleId: t.moduleId,
+        name: t.name,
+        assigneeUserId: t.assigneeUserId ?? null,
+        priority: t.priority || 'MEDIUM',
+        status: t.status || 'NOT_STARTED',
+        progress: typeof t.progress === 'number' ? t.progress : 0,
+        estimatedMinutes: t.estimatedMinutes ?? null,
+        actualMinutes: t.actualMinutes ?? null,
+        startDate: t.startDate ? dayjs(t.startDate) : null,
+        endDate: t.endDate ? dayjs(t.endDate) : null,
+        description: t.description ?? null,
+        notes: t.notes ?? null,
+      });
+      setTaskOpen(true);
+    } catch (e) {
+      message.error('Không thể tải thông tin task');
+    }
   };
 
   const createTask = async () => {
@@ -222,6 +306,50 @@ const ProjectDetail = () => {
     }
   };
 
+  const updateTaskFull = async () => {
+    try {
+      const values = await taskForm.validateFields();
+      const payload = {
+        name: values.name,
+        assigneeUserId: values.assigneeUserId || null,
+        status: values.status,
+        priority: values.priority,
+        progress: values.progress || 0,
+        description: values.description ?? null,
+        notes: values.notes ?? null,
+        startDate: values.startDate ? values.startDate.format('YYYY-MM-DD') : null,
+        endDate: values.endDate ? values.endDate.format('YYYY-MM-DD') : null,
+        estimatedMinutes: values.estimatedMinutes || null,
+        actualMinutes: values.actualMinutes || null,
+      };
+      await axios.put(`/api/project-tasks/${editingTask.id}`, payload);
+      message.success('Đã cập nhật task');
+      setTaskOpen(false);
+      setEditingTask(null);
+      taskForm.resetFields();
+      fetchKanban();
+      fetchProject();
+      fetchModules();
+    } catch (e) {
+      if (e?.errorFields) return;
+      message.error('Không thể cập nhật task');
+    }
+  };
+
+  const deleteTask = async (taskId) => {
+    try {
+      await axios.delete(`/api/project-tasks/${taskId}`);
+      message.success('Đã xóa task');
+      fetchKanban();
+      fetchProject();
+      fetchModules();
+      fetchTeamSummary();
+      fetchTeamTasks();
+    } catch (e) {
+      message.error(e?.response?.data?.message || 'Không thể xóa task');
+    }
+  };
+
   const updateTask = async (taskId, patch) => {
     try {
       await axios.put(`/api/project-tasks/${taskId}`, patch);
@@ -240,7 +368,13 @@ const ProjectDetail = () => {
         <Space direction="vertical" style={{ width: '100%' }} size={6}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
             <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.name}</div>
-            <Tag color={statusMeta?.color || 'default'}>{statusMeta?.label || t.status}</Tag>
+            <Space size={6}>
+              <Button size="small" icon={<EditOutlined />} onClick={() => openEditTask(t.id)} />
+              <Popconfirm title="Xóa task này?" okText="Xóa" cancelText="Hủy" onConfirm={() => deleteTask(t.id)}>
+                <Button size="small" danger icon={<DeleteOutlined />} />
+              </Popconfirm>
+              <Tag color={statusMeta?.color || 'default'}>{statusMeta?.label || t.status}</Tag>
+            </Space>
           </div>
           <Progress percent={t.progress || 0} size="small" />
           <Space wrap>
@@ -387,6 +521,8 @@ const ProjectDetail = () => {
         <Col xs={24} lg={16}>
           <Card>
             <Tabs
+              activeKey={activeTab}
+              onChange={(k) => setActiveTab(k)}
               items={[
                 {
                   key: 'modules',
@@ -413,11 +549,31 @@ const ProjectDetail = () => {
                           <Col xs={24} md={12} key={m.id}>
                             <Card
                               size="small"
-                              title={`${m.id} - ${m.name}`}
+                              title={m.name}
                               extra={
-                                <Button onClick={() => setSelectedModuleId(m.id)}>
-                                  Xem Kanban
-                                </Button>
+                                <Space>
+                                  {canManage && (
+                                    <Button size="small" icon={<EditOutlined />} onClick={() => openEditModule(m)}>
+                                      Sửa
+                                    </Button>
+                                  )}
+                                  {canManage && (
+                                    <Popconfirm title="Xóa module và toàn bộ task trong module?" okText="Xóa" cancelText="Hủy" onConfirm={() => deleteModule(m.id)}>
+                                      <Button size="small" danger icon={<DeleteOutlined />}>
+                                        Xóa
+                                      </Button>
+                                    </Popconfirm>
+                                  )}
+                                  <Button
+                                    size="small"
+                                    onClick={() => {
+                                      setSelectedModuleId(m.id);
+                                      setActiveTab('kanban');
+                                    }}
+                                  >
+                                    Xem Kanban
+                                  </Button>
+                                </Space>
                               }
                             >
                               <Space direction="vertical" style={{ width: '100%' }}>
@@ -581,9 +737,12 @@ const ProjectDetail = () => {
 
       <Modal
         open={moduleOpen}
-        title="Thêm module"
-        onCancel={() => setModuleOpen(false)}
-        onOk={createModule}
+        title={editingModule ? 'Sửa module' : 'Thêm module'}
+        onCancel={() => {
+          setModuleOpen(false);
+          setEditingModule(null);
+        }}
+        onOk={editingModule ? updateModule : createModule}
         okText="Lưu"
         destroyOnClose
       >
@@ -614,15 +773,18 @@ const ProjectDetail = () => {
 
       <Modal
         open={taskOpen}
-        title="Thêm task"
-        onCancel={() => setTaskOpen(false)}
-        onOk={createTask}
+        title={editingTask ? 'Sửa task' : 'Thêm task'}
+        onCancel={() => {
+          setTaskOpen(false);
+          setEditingTask(null);
+        }}
+        onOk={editingTask ? updateTaskFull : createTask}
         okText="Lưu"
         destroyOnClose
       >
         <Form form={taskForm} layout="vertical">
           <Form.Item name="moduleId" label="Module" rules={[{ required: true, message: 'Vui lòng chọn module' }]}>
-            <Select options={(modules || []).map((m) => ({ value: m.id, label: `${m.id} - ${m.name}` }))} />
+            <Select disabled={!!editingTask} options={(modules || []).map((m) => ({ value: m.id, label: `${m.id} - ${m.name}` }))} />
           </Form.Item>
           <Form.Item name="name" label="Tên công việc" rules={[{ required: true, message: 'Vui lòng nhập tên công việc' }]}>
             <Input />
