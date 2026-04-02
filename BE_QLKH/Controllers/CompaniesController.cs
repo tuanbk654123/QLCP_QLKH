@@ -15,12 +15,14 @@ namespace BE_QLKH.Controllers;
 public class CompaniesController : ControllerBase
 {
     private readonly IMongoCollection<Company> _companies;
+    private readonly IMongoCollection<UserCompany> _userCompanies;
     private readonly IPermissionService _permissionService;
 
     public CompaniesController(IMongoClient client, IOptions<MongoDbSettings> options, IPermissionService permissionService)
     {
         var db = client.GetDatabase(options.Value.DatabaseName);
         _companies = db.GetCollection<Company>("companies");
+        _userCompanies = db.GetCollection<UserCompany>("user_companies");
         _permissionService = permissionService;
     }
 
@@ -150,6 +152,22 @@ public class CompaniesController : ControllerBase
         company.UpdatedBy = GetActorLegacyId();
 
         await _companies.ReplaceOneAsync(c => c.Id == id, company);
+        return Ok(new { message = "OK" });
+    }
+
+    [HttpDelete("{id}")]
+    public async Task<ActionResult<object>> Delete(string id)
+    {
+        if (!await HasCompanyPermission("manage", "W")) return StatusCode(403, new { message = "Bạn không có quyền" });
+        if (!ObjectId.TryParse(id, out _)) return BadRequest(new { message = "Id không hợp lệ" });
+
+        var company = await _companies.Find(c => c.Id == id).FirstOrDefaultAsync();
+        if (company == null) return NotFound(new { message = "Không tìm thấy công ty" });
+
+        var hasAnyUser = await _userCompanies.Find(x => x.CompanyId == id).AnyAsync();
+        if (hasAnyUser) return BadRequest(new { message = "Công ty đang được gán cho nhân viên, không thể xóa" });
+
+        await _companies.DeleteOneAsync(c => c.Id == id);
         return Ok(new { message = "OK" });
     }
 

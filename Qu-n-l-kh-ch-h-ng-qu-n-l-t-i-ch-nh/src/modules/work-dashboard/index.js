@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Card, Col, DatePicker, Drawer, Input, Progress, Row, Select, Space, Statistic, Table, Tabs, Tag, Typography, message } from 'antd';
-import { ReloadOutlined } from '@ant-design/icons';
+import { Button, Card, Col, DatePicker, Drawer, Input, Popconfirm, Progress, Row, Select, Space, Statistic, Table, Tabs, Tag, Typography, message } from 'antd';
+import { DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import { useAuth } from '../../context/AuthContext';
@@ -23,6 +23,11 @@ const WorkDashboard = () => {
   const isGlobal = useMemo(() => {
     const role = user?.role;
     return ['admin', 'ceo', 'assistant_ceo'].includes(role);
+  }, [user]);
+
+  const canPurge = useMemo(() => {
+    const role = user?.role;
+    return ['admin', 'ceo'].includes(role);
   }, [user]);
 
   const canViewCompany = useMemo(() => {
@@ -74,7 +79,10 @@ const WorkDashboard = () => {
 
   const buildParams = useCallback(() => {
     const params = {};
-    if (isGlobal && companyId) params.companyId = companyId;
+    if (isGlobal) {
+      const cid = companyId || user?.companyId;
+      if (cid) params.companyId = cid;
+    }
     if (typeof assigneeUserId === 'number') params.assigneeUserId = assigneeUserId;
     if (status) params.status = status;
     if (overdueOnly) params.overdueOnly = true;
@@ -84,7 +92,7 @@ const WorkDashboard = () => {
       params.toDate = dayjs(dateRange[1]).format('YYYY-MM-DD');
     }
     return params;
-  }, [assigneeUserId, companyId, dateRange, isGlobal, overdueOnly, search, status]);
+  }, [assigneeUserId, companyId, dateRange, isGlobal, overdueOnly, search, status, user]);
 
   const fetchCompanies = useCallback(async () => {
     if (!isGlobal) return;
@@ -145,6 +153,19 @@ const WorkDashboard = () => {
     fetchTasks();
   }, [fetchSummary, fetchTeam, fetchTasks]);
 
+  const purgeAll = useCallback(async () => {
+    try {
+      const params = {};
+      if (isGlobal && companyId) params.companyId = companyId;
+      const res = await axios.delete('/api/work-dashboard/purge', { params });
+      message.success(`Đã xóa ${res.data?.deletedTasks ?? 0} task`);
+      setDrawerOpen(false);
+      refreshAll();
+    } catch (e) {
+      message.error(e?.response?.data?.message || 'Không thể xóa dữ liệu');
+    }
+  }, [companyId, isGlobal, refreshAll]);
+
   const fetchUserDrill = useCallback(async () => {
     if (!drawerUser?.assigneeUserId) return;
     setDrillLoading(true);
@@ -170,6 +191,12 @@ const WorkDashboard = () => {
   useEffect(() => {
     fetchCompanies();
   }, [fetchCompanies]);
+
+  useEffect(() => {
+    if (!isGlobal) return;
+    if (companyId) return;
+    if (user?.companyId) setCompanyId(user.companyId);
+  }, [companyId, isGlobal, user]);
 
   useEffect(() => {
     if (!canView) return;
@@ -264,16 +291,19 @@ const WorkDashboard = () => {
             {isGlobal && (
               <Select
                 allowClear
-                placeholder="Tất cả công ty"
+                placeholder="Chọn công ty"
                 style={{ width: 260 }}
                 value={companyId}
                 onChange={(v) => {
-                  setCompanyId(v || null);
+                  setCompanyId(v || user?.companyId || null);
                   setAssigneeUserId(null);
                   setDrawerOpen(false);
                   setPage(1);
                 }}
-                options={(companyOptions || []).map((c) => ({ value: c.id, label: `${c.code} - ${c.name}` }))}
+                options={[
+                  { value: '__ALL__', label: 'Tất cả công ty' },
+                  ...(companyOptions || []).map((c) => ({ value: c.id, label: `${c.code} - ${c.name}` })),
+                ]}
               />
             )}
             <DatePicker.RangePicker
@@ -344,6 +374,18 @@ const WorkDashboard = () => {
             <Button icon={<ReloadOutlined />} onClick={refreshAll}>
               Refresh
             </Button>
+            {canPurge && (
+              <Popconfirm
+                title="Xóa toàn bộ task trong Dashboard công việc?"
+                okText="Xóa"
+                cancelText="Hủy"
+                onConfirm={purgeAll}
+              >
+                <Button danger icon={<DeleteOutlined />}>
+                  Xóa tất cả
+                </Button>
+              </Popconfirm>
+            )}
           </Space>
         </Space>
       </Card>

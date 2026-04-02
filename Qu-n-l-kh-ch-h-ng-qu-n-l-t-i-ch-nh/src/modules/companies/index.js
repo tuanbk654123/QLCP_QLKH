@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Button, Card, Form, Input, Modal, Space, Table, Tag, message, Select } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { Button, Card, Form, Input, Modal, Popconfirm, Space, Table, Tag, message, Select } from 'antd';
+import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import axios from 'axios';
 
 const Companies = () => {
@@ -60,6 +60,17 @@ const Companies = () => {
             >
               Sửa
             </Button>
+            <Popconfirm title="Xóa công ty này?" okText="Xóa" cancelText="Hủy" onConfirm={async () => {
+              try {
+                await axios.delete(`/api/companies/${record.id}`);
+                message.success('Đã xóa công ty');
+                fetchData(search);
+              } catch (err) {
+                message.error(err?.response?.data?.message || 'Không thể xóa công ty');
+              }
+            }}>
+              <Button size="small" danger icon={<DeleteOutlined />} />
+            </Popconfirm>
           </Space>
         ),
       },

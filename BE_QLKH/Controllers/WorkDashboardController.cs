@@ -16,6 +16,7 @@ public class WorkDashboardController : ControllerBase
 {
     private readonly IMongoDatabase _db;
     private readonly IMongoCollection<ProjectTask> _tasks;
+    private readonly IMongoCollection<ProjectTaskActivity> _activities;
     private readonly IMongoCollection<Project> _projects;
     private readonly IMongoCollection<ProjectModule> _modules;
     private readonly IMongoCollection<User> _users;
@@ -25,6 +26,7 @@ public class WorkDashboardController : ControllerBase
     {
         _db = client.GetDatabase(options.Value.DatabaseName);
         _tasks = _db.GetCollection<ProjectTask>("project_tasks");
+        _activities = _db.GetCollection<ProjectTaskActivity>("project_task_activities");
         _projects = _db.GetCollection<Project>("projects");
         _modules = _db.GetCollection<ProjectModule>("project_modules");
         _users = _db.GetCollection<User>("users");
@@ -52,20 +54,32 @@ public class WorkDashboardController : ControllerBase
                string.Equals(role, "assistant_ceo", StringComparison.OrdinalIgnoreCase);
     }
 
+    private static bool CanPurge(string role)
+    {
+        return string.Equals(role, "admin", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(role, "ceo", StringComparison.OrdinalIgnoreCase);
+    }
+
     private async Task<(List<string> CompanyIds, bool SelfOnly, int SelfLegacyId)> ResolveScopeAsync(string role, DashboardFilterRequest req)
     {
         var selfLegacyId = GetActorLegacyId();
 
         if (CanViewAllCompanies(role))
         {
-            var all = await _companies.Find(c => c.Status == "active").Project(c => c.Id).ToListAsync();
-            var ids = all.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
+            var activeCompanyId = TenantContext.GetCompanyIdOrThrow(User);
+            if (string.Equals(req.CompanyId, "__ALL__", StringComparison.OrdinalIgnoreCase))
+            {
+                var all = await _companies.Find(c => c.Status == "active").Project(c => c.Id).ToListAsync();
+                var ids = all.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
+                return (ids, false, selfLegacyId);
+            }
+
             if (!string.IsNullOrWhiteSpace(req.CompanyId))
             {
-                if (!ids.Contains(req.CompanyId)) return (new List<string>(), false, selfLegacyId);
                 return (new List<string> { req.CompanyId }, false, selfLegacyId);
             }
-            return (ids, false, selfLegacyId);
+
+            return (new List<string> { activeCompanyId }, false, selfLegacyId);
         }
 
         var companyId = TenantContext.GetCompanyIdOrThrow(User);
@@ -127,6 +141,61 @@ public class WorkDashboardController : ControllerBase
         if (string.IsNullOrWhiteSpace(dateStr)) return null;
         if (DateTime.TryParse(dateStr, out var dt)) return dt.ToString("yyyy-MM-dd");
         return dateStr;
+    }
+
+    [HttpDelete("purge")]
+    public async Task<ActionResult<object>> Purge([FromQuery] string? companyId)
+    {
+        var role = GetRole(User);
+        if (!CanPurge(role)) return StatusCode(403, new { message = "Bạn không có quyền" });
+
+        var actorId = GetActorLegacyId();
+        var now = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
+
+        List<string> companyIds;
+        if (string.Equals(companyId, "__ALL__", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!CanViewAllCompanies(role)) return StatusCode(403, new { message = "Bạn không có quyền" });
+            companyIds = await _companies.Find(c => c.Status == "active").Project(c => c.Id).ToListAsync();
+            companyIds = companyIds.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
+        }
+        else if (!string.IsNullOrWhiteSpace(companyId))
+        {
+            companyIds = new List<string> { companyId };
+        }
+        else
+        {
+            companyIds = new List<string> { TenantContext.GetCompanyIdOrThrow(User) };
+        }
+
+        if (companyIds.Count == 0) return Ok(new { message = "OK", deletedTasks = 0 });
+
+        var taskFilter = TenantContext.CompanyIdsFilter<ProjectTask>(companyIds);
+        var deletedTasks = await _tasks.CountDocumentsAsync(taskFilter);
+        await _tasks.DeleteManyAsync(taskFilter);
+        await _activities.DeleteManyAsync(TenantContext.CompanyIdsFilter<ProjectTaskActivity>(companyIds));
+
+        var moduleUpdate = Builders<ProjectModule>.Update
+            .Set(m => m.TaskCount, 0)
+            .Set(m => m.TaskDoneCount, 0)
+            .Set(m => m.WeightedProgressSum, 0)
+            .Set(m => m.WeightSum, 0)
+            .Set(m => m.Progress, 0)
+            .Set(m => m.UpdatedAt, now)
+            .Set(m => m.UpdatedBy, actorId);
+        await _modules.UpdateManyAsync(TenantContext.CompanyIdsFilter<ProjectModule>(companyIds), moduleUpdate);
+
+        var projectUpdate = Builders<Project>.Update
+            .Set(p => p.TaskCount, 0)
+            .Set(p => p.TaskDoneCount, 0)
+            .Set(p => p.WeightedProgressSum, 0)
+            .Set(p => p.WeightSum, 0)
+            .Set(p => p.Progress, 0)
+            .Set(p => p.UpdatedAt, now)
+            .Set(p => p.UpdatedBy, actorId);
+        await _projects.UpdateManyAsync(TenantContext.CompanyIdsFilter<Project>(companyIds), projectUpdate);
+
+        return Ok(new { message = "OK", deletedTasks });
     }
 
     [HttpGet("companies")]

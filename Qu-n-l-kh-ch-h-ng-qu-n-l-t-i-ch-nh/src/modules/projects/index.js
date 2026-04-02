@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Card, DatePicker, Form, Input, InputNumber, Modal, Progress, Select, Space, Table, Tag, Typography, message } from 'antd';
-import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
+import { Button, Card, DatePicker, Form, Input, InputNumber, Modal, Popconfirm, Progress, Select, Space, Table, Tag, Typography, message } from 'antd';
+import { DeleteOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
@@ -125,6 +125,16 @@ const Projects = () => {
     }
   };
 
+  const deleteProject = async (id) => {
+    try {
+      await axios.delete(`/api/projects/${id}`);
+      message.success('Đã xóa dự án');
+      fetchData();
+    } catch (e) {
+      message.error(e?.response?.data?.message || 'Không thể xóa dự án');
+    }
+  };
+
   const statusTag = useCallback((status) => {
     const meta = statusOptions.find((x) => x.value === status);
     return <Tag color={meta?.color || 'default'}>{meta?.label || status}</Tag>;
@@ -177,7 +187,14 @@ const Projects = () => {
             key: 'action',
             width: 110,
             fixed: 'right',
-            render: (_, r) => <Button onClick={() => openEdit(r)}>Sửa</Button>,
+            render: (_, r) => (
+              <Space size={6}>
+                <Button onClick={() => openEdit(r)}>Sửa</Button>
+                <Popconfirm title="Xóa dự án này? (sẽ xóa luôn module/task)" okText="Xóa" cancelText="Hủy" onConfirm={() => deleteProject(r.id)}>
+                  <Button danger icon={<DeleteOutlined />} />
+                </Popconfirm>
+              </Space>
+            ),
           }
         : null,
     ].filter(Boolean);

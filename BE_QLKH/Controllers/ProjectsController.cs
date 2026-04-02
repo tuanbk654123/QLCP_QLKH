@@ -278,17 +278,17 @@ public class ProjectsController : ControllerBase
         var role = GetRole(User);
         if (!CanManageProjects(role)) return StatusCode(403, new { message = "Bạn không có quyền xóa dự án" });
 
-        var companyId = TenantContext.GetCompanyIdOrThrow(User);
-        var projectFilter = TenantContext.CompanyFilter<Project>(companyId) & Builders<Project>.Filter.Eq(p => p.LegacyId, id);
+        var projectFilter = TenantContext.ScopeFilter<Project>(User) & Builders<Project>.Filter.Eq(p => p.LegacyId, id);
         var project = await _projects.Find(projectFilter).FirstOrDefaultAsync();
         if (project == null) return NotFound(new { message = "Project not found" });
 
+        var companyId = project.CompanyId;
         var moduleFilter = TenantContext.CompanyFilter<ProjectModule>(companyId) & Builders<ProjectModule>.Filter.Eq(m => m.ProjectId, project.Id);
         var taskFilter = TenantContext.CompanyFilter<ProjectTask>(companyId) & Builders<ProjectTask>.Filter.Eq(t => t.ProjectId, project.Id);
 
         await _tasks.DeleteManyAsync(taskFilter);
         await _modules.DeleteManyAsync(moduleFilter);
-        await _projects.DeleteOneAsync(projectFilter);
+        await _projects.DeleteOneAsync(x => x.Id == project.Id);
 
         return Ok(new { message = "Project deleted" });
     }
