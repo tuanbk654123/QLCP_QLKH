@@ -1,4 +1,5 @@
 crm.anneco.vn {
+
 	encode zstd gzip
 
 	@api path /api/*
@@ -6,13 +7,11 @@ crm.anneco.vn {
 		reverse_proxy backend:8080
 	}
 
-	@minio path /minio/*
-	handle_path @minio {
+	handle_path /minio/* {
 		reverse_proxy minio:9000
 	}
 
-	@minio_console path /minio-console/*
-	handle_path @minio_console {
+	handle_path /minio-console/* {
 		reverse_proxy minio:9001
 	}
 
