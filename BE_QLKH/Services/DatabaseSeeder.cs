@@ -428,7 +428,6 @@ public class DatabaseSeeder : IHostedService
         var defaultCompanyId = defaultCompany?.Id ?? string.Empty;
         var defaultCompanyName = defaultCompany?.Name ?? string.Empty;
 
-        var usersCollection = db.GetCollection<User>("users");
         if (isProdSeed)
         {
             var adminUsername = (Environment.GetEnvironmentVariable("PROD_ADMIN_USERNAME") ?? "admin").Trim();
@@ -652,7 +651,6 @@ public class DatabaseSeeder : IHostedService
             await projectCodesCollection.InsertManyAsync(projectCodes, cancellationToken: cancellationToken);
         }
 
-        var customersCollection = db.GetCollection<Customer>("customers");
         if (!isProdSeed && await customersCollection.CountDocumentsAsync(_ => true, cancellationToken: cancellationToken) == 0)
         {
             var customers = new List<Customer>
@@ -1071,7 +1069,6 @@ public class DatabaseSeeder : IHostedService
             }
         }
 
-        var costsCollection = db.GetCollection<Cost>("costs");
         if (!isProdSeed && await costsCollection.CountDocumentsAsync(_ => true, cancellationToken: cancellationToken) == 0)
         {
             var costs = new List<Cost>
@@ -1480,7 +1477,6 @@ public class DatabaseSeeder : IHostedService
             await costsCollection.InsertManyAsync(costs, cancellationToken: cancellationToken);
         }
 
-        var rolesCollection = db.GetCollection<Role>("roles");
         var defaultRoles = new List<Role>
         {
             new Role { Code = "marketing_sales", Name = "Marketing/Sales", IsActive = true, IsSystem = true },
@@ -1563,7 +1559,6 @@ public class DatabaseSeeder : IHostedService
              }
         }
 
-        var fieldsCollection = db.GetCollection<FieldDef>("fields");
         var fieldPermissionsCollection = db.GetCollection<FieldPermission>("field_permissions");
 
         if (await fieldsCollection.CountDocumentsAsync(_ => true, cancellationToken: cancellationToken) == 0)
@@ -1883,8 +1878,6 @@ public class DatabaseSeeder : IHostedService
         }
 
         // Force update permissions to ensure consistency (fix for Manager Approval issue)
-        var fpCollection = db.GetCollection<FieldPermission>("field_permissions");
-        
         // 1. Ensure IP Manager has Write permission on managerApproval
         var managerUpdate = Builders<FieldPermission>.Update.Set(p => p.PermissionLevel, "W");
         await fpCollection.UpdateOneAsync(
@@ -2755,8 +2748,6 @@ public class DatabaseSeeder : IHostedService
                  );
              }
         }
-
-        var permissionRoles = new[] { "marketing_sales", "ip_executive", "ip_manager", "accountant", "director", "ceo", "assistant_ceo", "assistant_director", "hr", "admin" };
 
         var companyFields = new List<FieldDef>
         {

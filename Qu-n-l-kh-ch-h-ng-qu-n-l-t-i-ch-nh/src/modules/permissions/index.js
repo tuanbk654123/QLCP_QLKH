@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, Table, Button, Tabs, message, Tag, Typography, Space, Dropdown } from 'antd';
 import { SaveOutlined, ReloadOutlined } from '@ant-design/icons';
 import axios from 'axios';
+import { useAuth } from '../../context/AuthContext';
 
 const { Title, Text } = Typography;
 
