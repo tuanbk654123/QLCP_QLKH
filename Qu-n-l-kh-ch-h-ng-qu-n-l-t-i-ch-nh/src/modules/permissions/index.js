@@ -88,12 +88,15 @@ const PermissionModule = ({ initialTab = 'qlkh' }) => {
       const newModulePerms = { ...prev[module] };
       
       if (fieldKey === 'access_all') {
-        // Nếu chọn (tất cả), cập nhật tất cả các trường khác trong module đó cho role này
-        Object.keys(newModulePerms).forEach(fk => {
-          newModulePerms[fk] = {
-            ...(newModulePerms[fk] || {}),
-            [roleKey]: value
-          };
+        // Nếu chọn (tất cả), cập nhật tất cả các trường có trong module này
+        const moduleFields = fields[module] || [];
+        moduleFields.forEach(group => {
+          group.children.forEach(field => {
+            newModulePerms[field.key] = {
+              ...(newModulePerms[field.key] || {}),
+              [roleKey]: value
+            };
+          });
         });
       } else {
         // Chỉ cập nhật trường cụ thể
