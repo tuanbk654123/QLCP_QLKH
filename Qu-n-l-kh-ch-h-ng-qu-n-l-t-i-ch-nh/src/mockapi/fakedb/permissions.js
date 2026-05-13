@@ -13,6 +13,7 @@ export const schedulingFields = [
     key: 'group_actions',
     label: 'I. Thao tác',
     children: [
+      { key: 'access_all', label: '(tất cả)' },
       { key: 'seedData', label: 'Dữ liệu mẫu' },
       { key: 'generate', label: 'Tạo lịch' },
       { key: 'export', label: 'Xuất Excel' },
@@ -39,6 +40,7 @@ export const qlkhFields = [
     key: 'group_general',
     label: 'I. Nhóm thông tin chung',
     children: [
+      { key: 'access_all', label: '(tất cả)' },
       { key: 'name', label: 'Doanh nghiệp' },
       { key: 'businessScale', label: 'Quy mô DN' },
       { key: 'taxCode', label: 'Mã số thuế' },
@@ -129,6 +131,7 @@ export const qlcpFields = [
     key: 'group_request',
     label: 'I. Nhóm thông tin đề nghị – hành chính',
     children: [
+      { key: 'access_all', label: '(tất cả)' },
       { key: 'requester', label: 'Người đề nghị' },
       { key: 'department', label: 'Phòng ban' },
       { key: 'priority', label: 'Ưu tiên' },
@@ -192,12 +195,134 @@ export const qlcpFields = [
   },
 ];
 
+export const userFields = [
+  {
+    key: 'group_users',
+    label: 'I. Nhân viên',
+    children: [
+      { key: 'access_all', label: '(tất cả)' },
+      { key: 'list', label: 'Danh sách nhân viên' },
+      { key: 'detail', label: 'Chi tiết nhân viên' },
+      { key: 'create', label: 'Thêm nhân viên' },
+      { key: 'update', label: 'Sửa nhân viên' },
+      { key: 'delete', label: 'Xóa nhân viên' },
+    ],
+  },
+];
+
+export const dashboardFields = [
+  {
+    key: 'group_dashboard',
+    label: 'I. Dashboard',
+    children: [
+      { key: 'access_all', label: '(tất cả)' },
+      { key: 'overview', label: 'Tổng quan' },
+      { key: 'kpi', label: 'Chỉ số KPI' },
+      { key: 'overview_all', label: 'Dashboard tổng (tất cả công ty)' },
+    ],
+  },
+];
+
+export const workDashboardFields = [
+  {
+    key: 'view',
+    label: 'Xem',
+    children: [
+      { key: 'access_all', label: '(tất cả)' },
+      { key: 'view', label: 'Xem dashboard công việc' },
+      { key: 'viewTeam', label: 'Xem theo nhân viên' },
+      { key: 'viewAllCompanies', label: 'Xem tổng nhiều công ty' },
+    ],
+  },
+];
+
+export const projectFields = [
+  {
+    key: 'group_view',
+    label: 'I. Dự án',
+    children: [
+      { key: 'access_all', label: '(tất cả)' },
+      { key: 'view', label: 'Xem danh sách/chi tiết dự án' },
+      { key: 'manage', label: 'Thêm/Sửa/Xóa dự án' },
+      { key: 'manageModules', label: 'Quản lý module' },
+      { key: 'manageTasks', label: 'Quản lý task' },
+    ],
+  },
+];
+
+export const companyFields = [
+  {
+    key: 'view',
+    label: 'Xem',
+    children: [
+      { key: 'access_all', label: '(tất cả)' },
+      { key: 'view', label: 'Xem danh sách công ty' },
+      { key: 'manage', label: 'Thêm/Sửa/Xóa công ty' },
+    ],
+  },
+];
+
+export const roleFields = [
+  {
+    key: 'view',
+    label: 'Xem',
+    children: [
+      { key: 'access_all', label: '(tất cả)' },
+      { key: 'view', label: 'Xem danh sách chức danh' },
+      { key: 'manage', label: 'Thêm/Sửa/Xóa chức danh' },
+    ],
+  },
+];
+
+export const permissionFields = [
+  {
+    key: 'view',
+    label: 'Xem',
+    children: [
+      { key: 'access_all', label: '(tất cả)' },
+      { key: 'view', label: 'Xem cấu hình phân quyền' },
+      { key: 'manage', label: 'Cập nhật phân quyền' },
+    ],
+  },
+];
+
+export const exportFields = [
+  {
+    key: 'group_export',
+    label: 'VIII. Xuất văn bản',
+    children: [
+      { key: 'access_all', label: '(tất cả)' },
+      { key: 'export_doc', label: 'Xuất văn bản' },
+    ],
+  },
+];
+
+export const auditFields = [
+  {
+    key: 'group_audit',
+    label: 'I. Lịch sử tác động',
+    children: [
+      { key: 'access_all', label: '(tất cả)' },
+      { key: 'view', label: 'Xem lịch sử tác động' },
+    ],
+  },
+];
+
 // Initial permissions (mock)
 // R: Read, W: Write, A: Approve, N: None/Hide
 export const initialPermissions = {
   qlkh: {},
   qlcp: {},
   scheduling: {},
+  users: {},
+  dashboard: {},
+  work_dashboard: {},
+  projects: {},
+  companies: {},
+  roles: {},
+  permissions: {},
+  export: {},
+  audit: {},
 };
 
 // Helper to initialize permissions
@@ -210,686 +335,31 @@ const init = () => {
     return map;
   };
 
-  const qlkhFieldPermissions = {
-    name: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      ip_manager: 'W',
-      accountant: 'R',
-      director: 'A',
-      ceo: 'A',
-    }),
-    businessScale: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      ip_manager: 'W',
-      accountant: 'N',
-      director: 'A',
-      ceo: 'A',
-    }),
-    taxCode: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      ip_manager: 'W',
-      accountant: 'R',
-      director: 'A',
-      ceo: 'A',
-    }),
-    address: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      ip_manager: 'W',
-      accountant: 'R',
-      director: 'A',
-      ceo: 'A',
-    }),
-    representativeName: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      ip_manager: 'W',
-      accountant: 'R',
-      director: 'A',
-      ceo: 'A',
-    }),
-    representativePosition: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      ip_manager: 'W',
-      accountant: 'N',
-      director: 'A',
-      ceo: 'A',
-    }),
-    idNumber: getRoleMap({
-      marketing_sales: 'N',
-      ip_executive: 'W',
-      ip_manager: 'W',
-      accountant: 'N',
-      director: 'A',
-      ceo: 'A',
-    }),
-    phone: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      ip_manager: 'W',
-      accountant: 'N',
-      director: 'A',
-      ceo: 'A',
-    }),
-    email: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      ip_manager: 'W',
-      accountant: 'N',
-      director: 'A',
-      ceo: 'A',
-    }),
-    contactPerson: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      ip_manager: 'W',
-      accountant: 'N',
-      director: 'A',
-      ceo: 'A',
-    }),
-    contactPhone: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      ip_manager: 'W',
-      accountant: 'N',
-      director: 'A',
-      ceo: 'A',
-    }),
-    contactEmail: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      ip_manager: 'W',
-      accountant: 'N',
-      director: 'A',
-      ceo: 'A',
-    }),
-    businessNeeds: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      ip_manager: 'W',
-      accountant: 'N',
-      director: 'A',
-      ceo: 'A',
-    }),
-    potentialLevel: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      ip_manager: 'A',
-      accountant: 'N',
-      director: 'A',
-      ceo: 'A',
-    }),
-    priority: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      ip_manager: 'A',
-      accountant: 'N',
-      director: 'A',
-      ceo: 'A',
-    }),
-    sourceClassification: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      ip_manager: 'W',
-      accountant: 'N',
-      director: 'A',
-      ceo: 'A',
-    }),
-    nsnnSource: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      ip_manager: 'W',
-      accountant: 'R',
-      director: 'A',
-      ceo: 'A',
-    }),
-    brandName: getRoleMap({
-      marketing_sales: 'R',
-      ip_executive: 'W',
-      ip_manager: 'A',
-      accountant: 'N',
-      director: 'A',
-      ceo: 'A',
-    }),
-    productsServices: getRoleMap({
-      marketing_sales: 'R',
-      ip_executive: 'W',
-      ip_manager: 'A',
-      accountant: 'N',
-      director: 'A',
-      ceo: 'A',
-    }),
-    ipGroup: getRoleMap({
-      marketing_sales: 'N',
-      ip_executive: 'W',
-      ip_manager: 'A',
-      accountant: 'N',
-      director: 'A',
-      ceo: 'A',
-    }),
-    owner: getRoleMap({
-      marketing_sales: 'N',
-      ip_executive: 'W',
-      ip_manager: 'A',
-      accountant: 'N',
-      director: 'A',
-      ceo: 'A',
-    }),
-    protectionTerritory: getRoleMap({
-      marketing_sales: 'N',
-      ip_executive: 'W',
-      ip_manager: 'A',
-      accountant: 'N',
-      director: 'A',
-      ceo: 'A',
-    }),
-    authorization: getRoleMap({
-      marketing_sales: 'N',
-      ip_executive: 'W',
-      ip_manager: 'A',
-      accountant: 'N',
-      director: 'A',
-      ceo: 'A',
-    }),
-    filingStatus: getRoleMap({
-      marketing_sales: 'N',
-      ip_executive: 'W',
-      ip_manager: 'A',
-      accountant: 'N',
-      director: 'A',
-      ceo: 'A',
-    }),
-    filingDate: getRoleMap({
-      marketing_sales: 'N',
-      ip_executive: 'W',
-      ip_manager: 'A',
-      accountant: 'N',
-      director: 'A',
-      ceo: 'A',
-    }),
-    applicationCode: getRoleMap({
-      marketing_sales: 'N',
-      ip_executive: 'W',
-      ip_manager: 'A',
-      accountant: 'N',
-      director: 'A',
-      ceo: 'A',
-    }),
-    issueDate: getRoleMap({
-      marketing_sales: 'N',
-      ip_executive: 'W',
-      ip_manager: 'A',
-      accountant: 'N',
-      director: 'A',
-      ceo: 'A',
-    }),
-    expiryDate: getRoleMap({
-      marketing_sales: 'N',
-      ip_executive: 'W',
-      ip_manager: 'A',
-      accountant: 'N',
-      director: 'A',
-      ceo: 'A',
-    }),
-    applicationReviewStatus: getRoleMap({
-      marketing_sales: 'N',
-      ip_executive: 'W',
-      ip_manager: 'A',
-      accountant: 'N',
-      director: 'A',
-      ceo: 'A',
-    }),
-    processingDeadline: getRoleMap({
-      marketing_sales: 'N',
-      ip_executive: 'W',
-      ip_manager: 'A',
-      accountant: 'N',
-      director: 'A',
-      ceo: 'A',
-    }),
-    renewalCycle: getRoleMap({
-      marketing_sales: 'N',
-      ip_executive: 'W',
-      ip_manager: 'A',
-      accountant: 'N',
-      director: 'A',
-      ceo: 'A',
-    }),
-    renewalDate: getRoleMap({
-      marketing_sales: 'N',
-      ip_executive: 'W',
-      ip_manager: 'A',
-      accountant: 'N',
-      director: 'A',
-      ceo: 'A',
-    }),
-    reminderDate: getRoleMap({
-      marketing_sales: 'N',
-      ip_executive: 'W',
-      ip_manager: 'A',
-      accountant: 'N',
-      director: 'A',
-      ceo: 'A',
-    }),
-    reminderStatus: getRoleMap({
-      marketing_sales: 'N',
-      ip_executive: 'W',
-      ip_manager: 'A',
-      accountant: 'N',
-      director: 'A',
-      ceo: 'A',
-    }),
-    consultingStatus: getRoleMap({
-      marketing_sales: 'R',
-      ip_executive: 'W',
-      ip_manager: 'W',
-      accountant: 'N',
-      director: 'A',
-      ceo: 'A',
-    }),
-    contractStatus: getRoleMap({
-      marketing_sales: 'R',
-      ip_executive: 'W',
-      ip_manager: 'W',
-      accountant: 'R',
-      director: 'A',
-      ceo: 'A',
-    }),
-    contractNumber: getRoleMap({
-      marketing_sales: 'N',
-      ip_executive: 'W',
-      ip_manager: 'W',
-      accountant: 'W',
-      director: 'A',
-      ceo: 'A',
-    }),
-    contractValue: getRoleMap({
-      marketing_sales: 'N',
-      ip_executive: 'W',
-      ip_manager: 'W',
-      accountant: 'W',
-      director: 'A',
-      ceo: 'A',
-    }),
-    stateFee: getRoleMap({
-      marketing_sales: 'N',
-      ip_executive: 'W',
-      ip_manager: 'W',
-      accountant: 'W',
-      director: 'A',
-      ceo: 'A',
-    }),
-    additionalFee: getRoleMap({
-      marketing_sales: 'N',
-      ip_executive: 'W',
-      ip_manager: 'W',
-      accountant: 'W',
-      director: 'A',
-      ceo: 'A',
-    }),
-    createdBy: getRoleMap({}),
-    updatedBy: getRoleMap({}),
-    updatedAt: getRoleMap({}),
-    documentLink: getRoleMap({
-      marketing_sales: 'R',
-      ip_executive: 'W',
-      ip_manager: 'A',
-      accountant: 'R',
-      director: 'W',
-      ceo: 'W',
-    }),
-    auditLog: getRoleMap({
-      marketing_sales: 'R',
-      ip_executive: 'R',
-      ip_manager: 'R',
-      accountant: 'N',
-      director: 'R',
-      ceo: 'A',
-      admin: 'A',
-    }),
-  };
-  const qlcpFieldPermissions = {
-    requester: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      admin: 'W',
-      ip_manager: 'R',
-      accountant: 'R',
-      director: 'R',
-      ceo: 'R',
-    }),
-    department: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      admin: 'W',
-      ip_manager: 'R',
-      accountant: 'R',
-      director: 'R',
-      ceo: 'R',
-    }),
-    priority: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      admin: 'W',
-      ip_manager: 'W',
-      accountant: 'R',
-      director: 'R',
-      ceo: 'R',
-    }),
-    requestDate: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      admin: 'W',
-      ip_manager: 'R',
-      accountant: 'W',
-      director: 'R',
-      ceo: 'R',
-    }),
-    projectCode: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      admin: 'W',
-      ip_manager: 'R',
-      accountant: 'R',
-      director: 'R',
-      ceo: 'R',
-    }),
-    content: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      admin: 'W',
-      ip_manager: 'W',
-      accountant: 'R',
-      director: 'R',
-      ceo: 'R',
-    }),
-    description: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      admin: 'W',
-      ip_manager: 'W',
-      accountant: 'R',
-      director: 'R',
-      ceo: 'R',
-    }),
-    transactionType: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      admin: 'W',
-      ip_manager: 'W',
-      accountant: 'R',
-      director: 'R',
-      ceo: 'R',
-    }),
-    voucherType: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      admin: 'W',
-      ip_manager: 'W',
-      accountant: 'R',
-      director: 'R',
-      ceo: 'R',
-    }),
-    transactionObject: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      admin: 'W',
-      ip_manager: 'W',
-      accountant: 'R',
-      director: 'R',
-      ceo: 'R',
-    }),
-    note: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      admin: 'W',
-      ip_manager: 'W',
-      accountant: 'W',
-      director: 'R',
-      ceo: 'R',
-    }),
-    amountBeforeTax: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      admin: 'W',
-      ip_manager: 'R',
-      accountant: 'W',
-      director: 'R',
-      ceo: 'R',
-    }),
-    taxRate: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      admin: 'W',
-      ip_manager: 'R',
-      accountant: 'W',
-      director: 'R',
-      ceo: 'R',
-    }),
-    totalAmount: getRoleMap({
-      marketing_sales: 'R',
-      ip_executive: 'R',
-      admin: 'R',
-      ip_manager: 'R',
-      accountant: 'R',
-      director: 'R',
-      ceo: 'R',
-    }),
-    taxCode: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      admin: 'W',
-      ip_manager: 'N',
-      accountant: 'W',
-      director: 'R',
-      ceo: 'R',
-    }),
-    voucherNumber: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      admin: 'W',
-      ip_manager: 'R',
-      accountant: 'W',
-      director: 'R',
-      ceo: 'R',
-    }),
-    voucherDate: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      admin: 'W',
-      ip_manager: 'R',
-      accountant: 'W',
-      director: 'R',
-      ceo: 'R',
-    }),
-    attachment: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      admin: 'W',
-      ip_manager: 'R',
-      accountant: 'W',
-      director: 'R',
-      ceo: 'R',
-    }),
-    paymentMethod: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      admin: 'W',
-      ip_manager: 'N',
-      accountant: 'W',
-      director: 'R',
-      ceo: 'R',
-    }),
-    accountNumber: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      admin: 'W',
-      ip_manager: 'N',
-      accountant: 'W',
-      director: 'R',
-      ceo: 'R',
-    }),
-    bank: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      admin: 'W',
-      ip_manager: 'N',
-      accountant: 'W',
-      director: 'R',
-      ceo: 'R',
-    }),
-    paymentStatus: getRoleMap({
-      marketing_sales: 'W',
-      ip_executive: 'W',
-      admin: 'W',
-      ip_manager: 'N',
-      accountant: 'W',
-      director: 'R',
-      ceo: 'R',
-    }),
-    managerApproval: getRoleMap({
-      marketing_sales: 'R',
-      ip_executive: 'R',
-      admin: 'R',
-      ip_manager: 'W',
-      accountant: 'R',
-      director: 'R',
-      ceo: 'R',
-    }),
-    directorApproval: getRoleMap({
-      marketing_sales: 'R',
-      ip_executive: 'R',
-      admin: 'R',
-      ip_manager: 'R',
-      accountant: 'R',
-      director: 'W',
-      ceo: 'R',
-    }),
-    accountantReview: getRoleMap({
-      marketing_sales: 'R',
-      ip_executive: 'R',
-      admin: 'R',
-      ip_manager: 'R',
-      accountant: 'W',
-      director: 'R',
-      ceo: 'R',
-    }),
-    adjustReason: getRoleMap({
-      marketing_sales: 'N',
-      ip_executive: 'N',
-      admin: 'N',
-      ip_manager: 'W',
-      accountant: 'W',
-      director: 'W',
-      ceo: 'R',
-    }),
-    rejectionReason: getRoleMap({
-      marketing_sales: 'N',
-      ip_executive: 'N',
-      admin: 'N',
-      ip_manager: 'W',
-      accountant: 'N',
-      director: 'W',
-      ceo: 'R',
-    }),
-    riskFlag: getRoleMap({
-      marketing_sales: 'N',
-      ip_executive: 'N',
-      admin: 'N',
-      ip_manager: 'R',
-      accountant: 'R',
-      director: 'W',
-      ceo: 'W',
-    }),
-    auditLog: getRoleMap({
-      marketing_sales: 'R',
-      ip_executive: 'R',
-      ip_manager: 'R',
-      accountant: 'R',
-      director: 'R',
-      ceo: 'A',
-      admin: 'A',
-    }),
-  };
+  const moduleDefinitions = [
+    { key: 'qlkh', fields: qlkhFields },
+    { key: 'qlcp', fields: qlcpFields },
+    { key: 'scheduling', fields: schedulingFields },
+    { key: 'users', fields: userFields },
+    { key: 'dashboard', fields: dashboardFields },
+    { key: 'work_dashboard', fields: workDashboardFields },
+    { key: 'projects', fields: projectFields },
+    { key: 'companies', fields: companyFields },
+    { key: 'roles', fields: roleFields },
+    { key: 'permissions', fields: permissionFields },
+    { key: 'export', fields: exportFields },
+    { key: 'audit', fields: auditFields },
+  ];
 
-  const schedulingFieldPermissions = {
-    seedData: getRoleMap({
-      admin: 'W',
-      director: 'W',
-      ceo: 'W',
-      ip_manager: 'W',
-      ip_executive: 'R',
-      marketing_sales: 'N',
-      accountant: 'N',
-    }),
-    generate: getRoleMap({
-      admin: 'W',
-      director: 'W',
-      ceo: 'W',
-      ip_manager: 'W',
-      ip_executive: 'R',
-      marketing_sales: 'N',
-      accountant: 'N',
-    }),
-    export: getRoleMap({
-      admin: 'W',
-      director: 'W',
-      ceo: 'W',
-      ip_manager: 'W',
-      ip_executive: 'W',
-      marketing_sales: 'N',
-      accountant: 'N',
-    }),
-    config: getRoleMap({
-      admin: 'W',
-      director: 'W',
-      ceo: 'W',
-      ip_manager: 'W',
-      ip_executive: 'R',
-      marketing_sales: 'N',
-      accountant: 'N',
-    }),
-    view: getRoleMap({
-      admin: 'R',
-      director: 'R',
-      ceo: 'R',
-      ip_manager: 'R',
-      ip_executive: 'R',
-      marketing_sales: 'N',
-      accountant: 'N',
-    }),
-  };
-
-  qlkhFields.forEach((group) => {
-    group.children.forEach((field) => {
-      const fieldConfig = qlkhFieldPermissions[field.key] || getRoleMap({});
-      if (!initialPermissions.qlkh[field.key]) initialPermissions.qlkh[field.key] = {};
-      roles.forEach((role) => {
-        initialPermissions.qlkh[field.key][role.key] = fieldConfig[role.key];
-      });
-    });
-  });
-
-  qlcpFields.forEach((group) => {
-    group.children.forEach((field) => {
-      const fieldConfig = qlcpFieldPermissions[field.key] || getRoleMap({});
-      if (!initialPermissions.qlcp[field.key]) initialPermissions.qlcp[field.key] = {};
-      roles.forEach((role) => {
-        initialPermissions.qlcp[field.key][role.key] = fieldConfig[role.key];
-      });
-    });
-  });
-
-  schedulingFields.forEach((group) => {
-    group.children.forEach((field) => {
-      const fieldConfig = schedulingFieldPermissions[field.key] || getRoleMap({});
-      if (!initialPermissions.scheduling[field.key]) initialPermissions.scheduling[field.key] = {};
-      roles.forEach((role) => {
-        initialPermissions.scheduling[field.key][role.key] = fieldConfig[role.key];
+  moduleDefinitions.forEach((mod) => {
+    mod.fields.forEach((group) => {
+      group.children.forEach((field) => {
+        if (!initialPermissions[mod.key][field.key]) {
+          initialPermissions[mod.key][field.key] = getRoleMap({
+            admin: 'A',
+            ceo: 'A',
+            director: 'A',
+          });
+        }
       });
     });
   });

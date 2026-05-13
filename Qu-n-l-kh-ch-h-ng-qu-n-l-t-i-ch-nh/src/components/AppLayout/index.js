@@ -118,39 +118,55 @@ const AppLayout = ({ children }) => {
     const role = user?.role;
     const canViewWorkDashboard = !!role;
 
-    const items = [
-      {
+    // Helper to check if a module is accessible based on the new "(tất cả)" field
+    const isModuleVisible = (module) => {
+      const level = getPermissionLevel(module, 'access_all');
+      return level !== 'N'; // If it's not 'N' (Hidden), then it's visible
+    };
+
+    const items = [];
+
+    if (isModuleVisible('dashboard')) {
+      items.push({
         key: '/dashboard',
         icon: <DashboardOutlined />,
         label: 'Dashboard',
-      },
-      ...(canViewWorkDashboard
-        ? [
-            {
-              key: '/work-dashboard',
-              icon: <BarChartOutlined />,
-              label: 'Dashboard công việc',
-            },
-          ]
-        : []),
-      {
+      });
+    }
+
+    if (canViewWorkDashboard && isModuleVisible('work_dashboard')) {
+      items.push({
+        key: '/work-dashboard',
+        icon: <BarChartOutlined />,
+        label: 'Dashboard công việc',
+      });
+    }
+
+    if (isModuleVisible('qlkh')) {
+      items.push({
         key: '/customers',
         icon: <UserOutlined />,
         label: 'Quản lý KH',
-      },
-      {
+      });
+    }
+
+    if (isModuleVisible('qlcp')) {
+      items.push({
         key: '/costs',
         icon: <DollarOutlined />,
         label: 'Quản lý tài chính - kế toán',
-      },
-      {
+      });
+    }
+
+    if (isModuleVisible('projects')) {
+      items.push({
         key: '/projects',
         icon: <CheckCircleOutlined />,
         label: 'Quản lý dự án',
-      },
-    ];
+      });
+    }
 
-    if (canAccessUsersModule()) {
+    if (canAccessUsersModule() && isModuleVisible('users')) {
       items.push({
         key: '/users',
         icon: <TeamOutlined />,
@@ -160,33 +176,41 @@ const AppLayout = ({ children }) => {
 
     // Chỉ admin và CEO mới thấy menu Phân quyền
     if (canAccessPermissions()) {
-      items.push({
-        key: '/permissions',
-        icon: <SafetyCertificateOutlined />,
-        label: 'Phân quyền',
-      });
+      if (isModuleVisible('permissions')) {
+        items.push({
+          key: '/permissions',
+          icon: <SafetyCertificateOutlined />,
+          label: 'Phân quyền',
+        });
+      }
 
-      items.push({
-        key: '/roles',
-        icon: <TagsOutlined />,
-        label: 'Quản lý chức danh',
-      });
+      if (isModuleVisible('roles')) {
+        items.push({
+          key: '/roles',
+          icon: <TagsOutlined />,
+          label: 'Quản lý chức danh',
+        });
+      }
 
+      if (isModuleVisible('companies')) {
+        items.push({
+          key: '/companies',
+          icon: <ShopOutlined />,
+          label: 'Quản lý công ty',
+        });
+      }
+    }
+
+    if (isModuleVisible('scheduling')) {
       items.push({
-        key: '/companies',
-        icon: <ShopOutlined />,
-        label: 'Quản lý công ty',
+        key: '/scheduling',
+        icon: <CalendarOutlined />,
+        label: 'Chấm công dự án',
       });
     }
 
-    items.push({
-      key: '/scheduling',
-      icon: <CalendarOutlined />,
-      label: 'Chấm công dự án',
-    });
-
     const exportDocPerm = getPermissionLevel('export', 'export_doc');
-    if (exportDocPerm && exportDocPerm !== 'N') {
+    if (exportDocPerm && exportDocPerm !== 'N' && isModuleVisible('export')) {
       items.push({
         key: '/export-word',
         icon: <FileTextOutlined />,
@@ -194,7 +218,7 @@ const AppLayout = ({ children }) => {
       });
     }
 
-    if (canAccessAuditLogs()) {
+    if (canAccessAuditLogs() && isModuleVisible('audit')) {
       items.push({
         key: '/audit-logs',
         icon: <HistoryOutlined />,

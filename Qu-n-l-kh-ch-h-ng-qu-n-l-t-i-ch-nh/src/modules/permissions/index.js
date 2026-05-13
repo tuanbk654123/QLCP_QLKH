@@ -6,19 +6,37 @@ import axios from 'axios';
 const { Title, Text } = Typography;
 
 const PermissionModule = ({ initialTab = 'qlkh' }) => {
+  const { checkAuth } = useAuth();
   const [loading, setLoading] = useState(false);
   const [roles, setRoles] = useState([]);
-  const [permissions, setPermissions] = useState({ qlkh: {}, qlcp: {}, users: {}, dashboard: {}, work_dashboard: {}, export: {}, scheduling: {}, audit: {}, companies: {}, projects: {} });
-  const [qlkhFields, setQlkhFields] = useState([]);
-  const [qlcpFields, setQlcpFields] = useState([]);
-  const [schedulingFields, setSchedulingFields] = useState([]);
-  const [userFields, setUserFields] = useState([]);
-  const [dashboardFields, setDashboardFields] = useState([]);
-  const [workDashboardFields, setWorkDashboardFields] = useState([]);
-  const [exportFields, setExportFields] = useState([]);
-  const [auditFields, setAuditFields] = useState([]);
-  const [companyFields, setCompanyFields] = useState([]);
-  const [projectFields, setProjectFields] = useState([]);
+  const [permissions, setPermissions] = useState({
+    qlkh: {},
+    qlcp: {},
+    users: {},
+    dashboard: {},
+    work_dashboard: {},
+    export: {},
+    scheduling: {},
+    audit: {},
+    companies: {},
+    projects: {},
+    roles: {},
+    permissions: {},
+  });
+  const [fields, setFields] = useState({
+    qlkh: [],
+    qlcp: [],
+    users: [],
+    dashboard: [],
+    work_dashboard: [],
+    export: [],
+    scheduling: [],
+    audit: [],
+    companies: [],
+    projects: [],
+    roles: [],
+    permissions: [],
+  });
 
   useEffect(() => {
     fetchPermissions();
@@ -27,31 +45,36 @@ const PermissionModule = ({ initialTab = 'qlkh' }) => {
   const fetchPermissions = async () => {
     setLoading(true);
     try {
-      const response = await axios.get('/api/permissions');
-      const data = response.data;
-      setRoles(data.roles);
+      const { data } = await axios.get('/api/permissions');
+      setRoles(data.roles || []);
       setPermissions({
-        qlkh: data.permissions?.qlkh || {},
-        qlcp: data.permissions?.qlcp || {},
-        users: data.permissions?.users || {},
-        dashboard: data.permissions?.dashboard || {},
-        work_dashboard: data.permissions?.work_dashboard || {},
-        export: data.permissions?.export || {},
-        scheduling: data.permissions?.scheduling || {},
-        audit: data.permissions?.audit || {},
-        companies: data.permissions?.companies || {},
-        projects: data.permissions?.projects || {},
+        qlkh: data.qlkhPermissions || {},
+        qlcp: data.qlcpPermissions || {},
+        users: data.userPermissions || {},
+        dashboard: data.dashboardPermissions || {},
+        work_dashboard: data.workDashboardPermissions || {},
+        export: data.exportPermissions || {},
+        scheduling: data.schedulingPermissions || {},
+        audit: data.auditPermissions || {},
+        companies: data.companyPermissions || {},
+        projects: data.projectPermissions || {},
+        roles: data.rolesPermissions || {},
+        permissions: data.permissionsPermissions || {},
       });
-      setQlkhFields(data.qlkhFields || []);
-      setQlcpFields(data.qlcpFields || []);
-      setSchedulingFields(data.schedulingFields || []);
-      setUserFields(data.userFields || []);
-      setDashboardFields(data.dashboardFields || []);
-      setWorkDashboardFields(data.workDashboardFields || []);
-      setExportFields(data.exportFields || []);
-      setAuditFields(data.auditFields || []);
-      setCompanyFields(data.companyFields || []);
-      setProjectFields(data.projectFields || []);
+      setFields({
+        qlkh: data.qlkhFields || [],
+        qlcp: data.qlcpFields || [],
+        users: data.userFields || [],
+        dashboard: data.dashboardFields || [],
+        work_dashboard: data.workDashboardFields || [],
+        export: data.exportFields || [],
+        scheduling: data.schedulingFields || [],
+        audit: data.auditFields || [],
+        companies: data.companyFields || [],
+        projects: data.projectFields || [],
+        roles: data.rolesFields || [],
+        permissions: data.permissionsFields || [],
+      });
     } catch (error) {
       console.error('Failed to fetch permissions:', error);
       message.error('Không thể tải dữ liệu phân quyền');
@@ -61,16 +84,30 @@ const PermissionModule = ({ initialTab = 'qlkh' }) => {
   };
 
   const handlePermissionChange = (module, fieldKey, roleKey, value) => {
-    setPermissions(prev => ({
-      ...prev,
-      [module]: {
-        ...prev[module],
-        [fieldKey]: {
-          ...(prev[module][fieldKey] || {}),
+    setPermissions(prev => {
+      const newModulePerms = { ...prev[module] };
+      
+      if (fieldKey === 'access_all') {
+        // Nếu chọn (tất cả), cập nhật tất cả các trường khác trong module đó cho role này
+        Object.keys(newModulePerms).forEach(fk => {
+          newModulePerms[fk] = {
+            ...(newModulePerms[fk] || {}),
+            [roleKey]: value
+          };
+        });
+      } else {
+        // Chỉ cập nhật trường cụ thể
+        newModulePerms[fieldKey] = {
+          ...(newModulePerms[fieldKey] || {}),
           [roleKey]: value
-        }
+        };
       }
-    }));
+
+      return {
+        ...prev,
+        [module]: newModulePerms
+      };
+    });
   };
 
   const handleSave = async () => {
@@ -78,6 +115,7 @@ const PermissionModule = ({ initialTab = 'qlkh' }) => {
     try {
       await axios.post('/api/permissions', permissions);
       message.success('Cập nhật phân quyền thành công');
+      await checkAuth(); // Tải lại quyền để menu cập nhật
     } catch (error) {
       console.error('Failed to save permissions:', error);
       message.error('Lỗi khi lưu phân quyền');
@@ -247,52 +285,62 @@ const PermissionModule = ({ initialTab = 'qlkh' }) => {
           {
             key: 'companies',
             label: 'Quản lý công ty',
-            children: renderTable('companies', companyFields),
+            children: renderTable('companies', fields.companies),
           },
           {
             key: 'qlkh',
             label: 'Quản lý Khách hàng',
-            children: renderTable('qlkh', qlkhFields),
+            children: renderTable('qlkh', fields.qlkh),
           },
           {
             key: 'qlcp',
             label: 'Quản lý Chi phí',
-            children: renderTable('qlcp', qlcpFields),
+            children: renderTable('qlcp', fields.qlcp),
           },
           {
             key: 'users',
             label: 'Quản lý Nhân viên',
-            children: renderTable('users', userFields),
+            children: renderTable('users', fields.users),
           },
           {
             key: 'projects',
             label: 'Quản lý dự án',
-            children: renderTable('projects', projectFields),
+            children: renderTable('projects', fields.projects),
           },
           {
             key: 'dashboard',
             label: 'Dashboard',
-            children: renderTable('dashboard', dashboardFields),
+            children: renderTable('dashboard', fields.dashboard),
           },
           {
             key: 'work_dashboard',
             label: 'Dashboard công việc',
-            children: renderTable('work_dashboard', workDashboardFields),
+            children: renderTable('work_dashboard', fields.work_dashboard),
           },
           {
             key: 'export',
             label: 'Xuất văn bản',
-            children: renderTable('export', exportFields),
+            children: renderTable('export', fields.export),
           },
           {
             key: 'scheduling',
             label: 'Chấm công dự án',
-            children: renderTable('scheduling', schedulingFields),
+            children: renderTable('scheduling', fields.scheduling),
           },
           {
             key: 'audit',
             label: 'Lịch sử tác động',
-            children: renderTable('audit', auditFields),
+            children: renderTable('audit', fields.audit),
+          },
+          {
+            key: 'roles',
+            label: 'Quản lý chức danh',
+            children: renderTable('roles', fields.roles),
+          },
+          {
+            key: 'permissions',
+            label: 'Cấu hình phân quyền',
+            children: renderTable('permissions', fields.permissions),
           },
         ]}
       />

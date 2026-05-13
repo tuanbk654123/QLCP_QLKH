@@ -25,7 +25,20 @@ export const AuthProvider = ({ children }) => {
 
   const loadModulePermissions = async () => {
     try {
-      const modules = ['users', 'dashboard', 'qlkh', 'qlcp', 'export', 'scheduling', 'audit'];
+      const modules = [
+        'users',
+        'dashboard',
+        'qlkh',
+        'qlcp',
+        'export',
+        'scheduling',
+        'audit',
+        'projects',
+        'work_dashboard',
+        'companies',
+        'roles',
+        'permissions',
+      ];
       const results = await Promise.all(
         modules.map((module) =>
           axios
