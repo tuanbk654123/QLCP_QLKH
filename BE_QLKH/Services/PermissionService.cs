@@ -1,5 +1,6 @@
 using BE_QLKH.Models;
 using Microsoft.Extensions.Options;
+using MongoDB.Bson;
 using MongoDB.Driver;
 
 namespace BE_QLKH.Services;
@@ -20,6 +21,7 @@ public class PermissionService : IPermissionService
 
     public async Task<PermissionMatrixDto> GetPermissionMatrixAsync()
     {
+        await EnsureAccessAllAsync();
         var rolesRaw = await _roles.Find(r => r.IsActive).ToListAsync();
         var roles = rolesRaw
             .Where(r => !string.IsNullOrWhiteSpace(r.Code))
@@ -145,6 +147,7 @@ public class PermissionService : IPermissionService
 
     public async Task<Dictionary<string, string>> GetRolePermissionsForModuleAsync(string moduleCode, string roleCode)
     {
+        await EnsureAccessAllAsync();
         var fields = await _fields.Find(f => f.ModuleCode == moduleCode).ToListAsync();
         var fieldCodes = fields.Select(f => f.Code).ToList();
 
@@ -250,5 +253,69 @@ public class PermissionService : IPermissionService
                     }).ToList()
             })
             .ToList();
+    }
+
+    private static readonly (string ModuleCode, string GroupCode, string GroupLabel)[] AccessAllModules =
+    [
+        ("qlkh", "group_general", "I. Nhóm thông tin chung"),
+        ("qlcp", "group_request", "I. Nhóm thông tin đề nghị – hành chính"),
+        ("dashboard", "group_dashboard", "I. Dashboard"),
+        ("work_dashboard", "view", "Xem"),
+        ("users", "group_users", "I. Nhân viên"),
+        ("projects", "group_view", "I. Dự án"),
+        ("export", "group_export", "VIII. Xuất văn bản"),
+        ("scheduling", "actions", "Chức năng"),
+        ("audit", "group_audit", "I. Lịch sử tác động"),
+        ("companies", "view", "Xem"),
+        ("roles", "view", "Xem"),
+        ("permissions", "view", "Xem")
+    ];
+
+    private async Task EnsureAccessAllAsync()
+    {
+        var rolesRaw = await _roles.Find(r => r.IsActive).ToListAsync();
+        var roleCodes = rolesRaw
+            .Where(r => !string.IsNullOrWhiteSpace(r.Code))
+            .Select(r => r.Code!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        foreach (var (moduleCode, groupCode, groupLabel) in AccessAllModules)
+        {
+            var fieldFilter = Builders<FieldDef>.Filter.Where(f => f.ModuleCode == moduleCode && f.Code == "access_all");
+            var fieldUpdate = Builders<FieldDef>.Update
+                .Set(f => f.Label, "(tất cả)")
+                .Set(f => f.GroupCode, groupCode)
+                .Set(f => f.GroupLabel, groupLabel)
+                .Set(f => f.OrderIndex, -1)
+                .SetOnInsert(f => f.Id, ObjectId.GenerateNewId().ToString())
+                .SetOnInsert(f => f.ModuleCode, moduleCode)
+                .SetOnInsert(f => f.Code, "access_all");
+
+            await _fields.UpdateOneAsync(fieldFilter, fieldUpdate, new UpdateOptions { IsUpsert = true });
+
+            foreach (var roleCode in roleCodes)
+            {
+                var defaultLevel = (roleCode.Equals("admin", StringComparison.OrdinalIgnoreCase) ||
+                                    roleCode.Equals("ceo", StringComparison.OrdinalIgnoreCase) ||
+                                    roleCode.Equals("assistant_ceo", StringComparison.OrdinalIgnoreCase))
+                    ? "A"
+                    : "R";
+
+                var permFilter = Builders<FieldPermission>.Filter.Where(p =>
+                    p.ModuleCode == moduleCode &&
+                    p.FieldCode == "access_all" &&
+                    p.RoleCode == roleCode);
+
+                var permUpdate = Builders<FieldPermission>.Update
+                    .SetOnInsert(p => p.Id, ObjectId.GenerateNewId().ToString())
+                    .SetOnInsert(p => p.ModuleCode, moduleCode)
+                    .SetOnInsert(p => p.FieldCode, "access_all")
+                    .SetOnInsert(p => p.RoleCode, roleCode)
+                    .SetOnInsert(p => p.PermissionLevel, defaultLevel);
+
+                await _fieldPermissions.UpdateOneAsync(permFilter, permUpdate, new UpdateOptions { IsUpsert = true });
+            }
+        }
     }
 }
