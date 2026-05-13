@@ -56,69 +56,9 @@ public class DatabaseSeeder : IHostedService
         await EnsureCollection("project_task_activities");
 
         var rolesCollection = db.GetCollection<Role>("roles");
-        var fieldsCollection = db.GetCollection<FieldDef>("fields");
-        var fpCollection = db.GetCollection<FieldPermission>("field_permissions");
         var usersCollection = db.GetCollection<User>("users");
         var customersCollection = db.GetCollection<Customer>("customers");
         var costsCollection = db.GetCollection<Cost>("costs");
-
-        var permissionRoles = new[] { "marketing_sales", "ip_executive", "ip_manager", "accountant", "director", "ceo", "assistant_ceo", "assistant_director", "hr", "admin" };
-
-        // --- ENSURE "(tất cả)" FIELD FOR ALL MODULES ---
-        var modulesToUpdate = new List<(string ModuleCode, string GroupCode, string GroupLabel)>
-        {
-            ("qlkh", "group_general", "I. Nhóm thông tin chung"),
-            ("qlcp", "group_request", "I. Nhóm thông tin đề nghị – hành chính"),
-            ("dashboard", "group_dashboard", "I. Dashboard"),
-            ("users", "group_users", "I. Nhân viên"),
-            ("projects", "group_view", "I. Dự án"),
-            ("work_dashboard", "view", "Xem"),
-            ("export", "group_export", "VIII. Xuất văn bản"),
-            ("scheduling", "actions", "Chức năng"),
-            ("audit", "group_audit", "I. Lịch sử tác động"),
-            ("companies", "view", "Xem"),
-            ("roles", "view", "Xem"),
-            ("permissions", "view", "Xem")
-        };
-
-        foreach (var mod in modulesToUpdate)
-        {
-            var accessAllField = new FieldDef
-            {
-                ModuleCode = mod.ModuleCode,
-                Code = "access_all",
-                Label = "(tất cả)",
-                GroupCode = mod.GroupCode,
-                GroupLabel = mod.GroupLabel,
-                OrderIndex = -1 // Always at the top
-            };
-
-            var existing = await fieldsCollection.Find(f => f.ModuleCode == mod.ModuleCode && f.Code == "access_all").FirstOrDefaultAsync(cancellationToken);
-            if (existing != null)
-            {
-                accessAllField.Id = existing.Id;
-                await fieldsCollection.ReplaceOneAsync(f => f.Id == existing.Id, accessAllField, new ReplaceOptions { IsUpsert = true }, cancellationToken);
-            }
-            else
-            {
-                accessAllField.Id = MongoDB.Bson.ObjectId.GenerateNewId().ToString();
-                await fieldsCollection.InsertOneAsync(accessAllField, cancellationToken: cancellationToken);
-            }
-
-            // Default permissions for access_all
-            foreach (var roleCode in permissionRoles)
-            {
-                // Admin/CEO usually have full access
-                var level = (roleCode == "admin" || roleCode == "ceo") ? "A" : "R";
-                
-                await fpCollection.UpdateOneAsync(
-                    p => p.ModuleCode == mod.ModuleCode && p.FieldCode == "access_all" && p.RoleCode == roleCode,
-                    Builders<FieldPermission>.Update.Set(p => p.PermissionLevel, level),
-                    new UpdateOptions { IsUpsert = true },
-                    cancellationToken
-                );
-            }
-        }
 
         async Task TryCreateIndex(string collectionName, CreateIndexModel<BsonDocument> model)
         {
@@ -1559,6 +1499,8 @@ public class DatabaseSeeder : IHostedService
              }
         }
 
+        var fieldsCollection = db.GetCollection<FieldDef>("fields");
+        var fpCollection = db.GetCollection<FieldPermission>("field_permissions");
         var fieldPermissionsCollection = db.GetCollection<FieldPermission>("field_permissions");
 
         if (await fieldsCollection.CountDocumentsAsync(_ => true, cancellationToken: cancellationToken) == 0)
@@ -1874,6 +1816,72 @@ public class DatabaseSeeder : IHostedService
             if (fieldPermissions.Count > 0)
             {
                 await fieldPermissionsCollection.InsertManyAsync(fieldPermissions, cancellationToken: cancellationToken);
+            }
+        }
+
+        // --- ENSURE "(tất cả)" FIELD FOR ALL MODULES (no overwrite existing permissions) ---
+        var accessAllRoles = new[] { "marketing_sales", "ip_executive", "ip_manager", "accountant", "director", "ceo", "assistant_ceo", "assistant_director", "hr", "admin" };
+        var modulesToEnsureAccessAll = new List<(string ModuleCode, string GroupCode, string GroupLabel)>
+        {
+            ("qlkh", "group_general", "I. Nhóm thông tin chung"),
+            ("qlcp", "group_request", "I. Nhóm thông tin đề nghị – hành chính"),
+            ("dashboard", "group_dashboard", "I. Dashboard"),
+            ("users", "group_users", "I. Nhân viên"),
+            ("projects", "group_view", "I. Dự án"),
+            ("work_dashboard", "view", "Xem"),
+            ("export", "group_export", "VIII. Xuất văn bản"),
+            ("scheduling", "actions", "Chức năng"),
+            ("audit", "group_audit", "I. Lịch sử tác động"),
+            ("companies", "view", "Xem"),
+            ("roles", "view", "Xem"),
+            ("permissions", "view", "Xem")
+        };
+
+        foreach (var mod in modulesToEnsureAccessAll)
+        {
+            var accessAllField = new FieldDef
+            {
+                ModuleCode = mod.ModuleCode,
+                Code = "access_all",
+                Label = "(tất cả)",
+                GroupCode = mod.GroupCode,
+                GroupLabel = mod.GroupLabel,
+                OrderIndex = -1
+            };
+
+            var existing = await fieldsCollection.Find(f => f.ModuleCode == mod.ModuleCode && f.Code == "access_all")
+                .FirstOrDefaultAsync(cancellationToken);
+            if (existing != null)
+            {
+                accessAllField.Id = existing.Id;
+                await fieldsCollection.ReplaceOneAsync(
+                    f => f.Id == existing.Id,
+                    accessAllField,
+                    new ReplaceOptions { IsUpsert = true },
+                    cancellationToken);
+            }
+            else
+            {
+                accessAllField.Id = ObjectId.GenerateNewId().ToString();
+                await fieldsCollection.InsertOneAsync(accessAllField, cancellationToken: cancellationToken);
+            }
+
+            foreach (var roleCode in accessAllRoles)
+            {
+                var level = (roleCode == "admin" || roleCode == "ceo" || roleCode == "assistant_ceo") ? "A" : "R";
+
+                var filter = Builders<FieldPermission>.Filter.Where(p =>
+                    p.ModuleCode == mod.ModuleCode &&
+                    p.FieldCode == "access_all" &&
+                    p.RoleCode == roleCode);
+
+                var update = Builders<FieldPermission>.Update
+                    .SetOnInsert(p => p.ModuleCode, mod.ModuleCode)
+                    .SetOnInsert(p => p.FieldCode, "access_all")
+                    .SetOnInsert(p => p.RoleCode, roleCode)
+                    .SetOnInsert(p => p.PermissionLevel, level);
+
+                await fpCollection.UpdateOneAsync(filter, update, new UpdateOptions { IsUpsert = true }, cancellationToken);
             }
         }
 
@@ -2748,6 +2756,8 @@ public class DatabaseSeeder : IHostedService
                  );
              }
         }
+
+        var permissionRoles = new[] { "marketing_sales", "ip_executive", "ip_manager", "accountant", "director", "ceo", "assistant_ceo", "assistant_director", "hr", "admin" };
 
         var companyFields = new List<FieldDef>
         {

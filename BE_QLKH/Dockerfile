@@ -1,5 +1,5 @@
-# Sử dụng image SDK của .NET 10 để build
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+# Sử dụng image SDK của .NET 6 để build
+FROM mcr.microsoft.com/dotnet/sdk:6.0 AS build
 WORKDIR /app
 
 # Copy file csproj và restore dependencies
@@ -11,7 +11,7 @@ COPY . ./
 RUN dotnet publish -c Release -o out
 
 # Sử dụng image Runtime để chạy ứng dụng (nhẹ hơn SDK)
-FROM mcr.microsoft.com/dotnet/aspnet:10.0
+FROM mcr.microsoft.com/dotnet/aspnet:6.0
 WORKDIR /app
 COPY --from=build /app/out .
 

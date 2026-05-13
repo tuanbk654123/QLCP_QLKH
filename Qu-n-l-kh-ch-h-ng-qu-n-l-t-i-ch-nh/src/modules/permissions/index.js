@@ -49,18 +49,18 @@ const PermissionModule = ({ initialTab = 'qlkh' }) => {
       const { data } = await axios.get('/api/permissions');
       setRoles(data.roles || []);
       setPermissions({
-        qlkh: data.qlkhPermissions || {},
-        qlcp: data.qlcpPermissions || {},
-        users: data.userPermissions || {},
-        dashboard: data.dashboardPermissions || {},
-        work_dashboard: data.workDashboardPermissions || {},
-        export: data.exportPermissions || {},
-        scheduling: data.schedulingPermissions || {},
-        audit: data.auditPermissions || {},
-        companies: data.companyPermissions || {},
-        projects: data.projectPermissions || {},
-        roles: data.rolesPermissions || {},
-        permissions: data.permissionsPermissions || {},
+        permissions: data.permissions?.permissions || {},
+        roles: data.permissions?.roles || {},
+        qlkh: data.permissions?.qlkh || {},
+        qlcp: data.permissions?.qlcp || {},
+        users: data.permissions?.users || {},
+        dashboard: data.permissions?.dashboard || {},
+        work_dashboard: data.permissions?.work_dashboard || {},
+        export: data.permissions?.export || {},
+        scheduling: data.permissions?.scheduling || {},
+        audit: data.permissions?.audit || {},
+        companies: data.permissions?.companies || {},
+        projects: data.permissions?.projects || {},
       });
       setFields({
         qlkh: data.qlkhFields || [],
